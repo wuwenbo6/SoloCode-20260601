@@ -1,0 +1,18 @@
+{
+  "models": [
+    {
+      "id": "cornell-box",
+      "name": "Cornell Box",
+      "fileName": "cornell-box.obj",
+      "triangleCount": 36,
+      "vertexCount": 24
+    },
+    {
+      "id": "cornell-box-spheres",
+      "name": "Cornell Box with Spheres",
+      "fileName": "cornell-box-spheres.obj",
+      "triangleCount": 5160,
+      "vertexCount": 2592
+    }
+  ]
+}

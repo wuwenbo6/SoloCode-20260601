@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  influxdb:
+    image: influxdb:2.7
+    container_name: smartband-influxdb
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=admin123
+      - DOCKER_INFLUXDB_INIT_ORG=smartband-org
+      - DOCKER_INFLUXDB_INIT_BUCKET=smartband-data
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=smartband-token
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  influxdb-data:
+  influxdb-config:

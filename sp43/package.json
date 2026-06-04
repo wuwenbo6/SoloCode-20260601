@@ -1,0 +1,16 @@
+{
+  "name": "webgpu-cloth-simulation",
+  "version": "1.0.0",
+  "description": "WebGPU cloth simulation with 128x128 particles, spring system, and interactive controls",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@webgpu/types": "^0.1.44",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11"
+  }
+}
