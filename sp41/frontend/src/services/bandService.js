@@ -265,18 +265,18 @@ class SmartBandService {
     switch (this.currentActivity) {
       case 'running':
         accelerometer = {
-          x: Math.random() * 4 - 2,
-          y: Math.random() * 4 - 2,
-          z: Math.random() * 2 - 1
+          x: Math.random() * 3 - 1.5,
+          y: Math.random() * 2 - 1,
+          z: 1.0 + Math.random() * 2.5 - 0.5
         };
         heartRate = 140 + Math.floor(Math.random() * 30);
         steps = 35 + Math.floor(Math.random() * 20);
         break;
       case 'cycling':
         accelerometer = {
-          x: Math.random() * 2 - 1,
-          y: Math.random() * 1.5 - 0.75,
-          z: Math.random() * 1 - 0.5
+          x: Math.random() * 1.0 - 0.5,
+          y: Math.random() * 0.8 - 0.4,
+          z: 1.0 + Math.random() * 0.6 - 0.2
         };
         heartRate = 120 + Math.floor(Math.random() * 20);
         steps = 0;
@@ -285,16 +285,16 @@ class SmartBandService {
         accelerometer = {
           x: Math.random() * 1.5 - 0.75,
           y: Math.random() * 2 - 1,
-          z: -0.8 + Math.random() * 0.6
+          z: -0.6 + Math.random() * 2.2
         };
         heartRate = 130 + Math.floor(Math.random() * 25);
         steps = 0;
         break;
       case 'walking':
         accelerometer = {
-          x: Math.random() * 1.5 - 0.75,
-          y: Math.random() * 1.5 - 0.75,
-          z: Math.random() * 0.5 - 0.25
+          x: Math.random() * 1.0 - 0.5,
+          y: Math.random() * 0.8 - 0.4,
+          z: 1.0 + Math.random() * 0.5 - 0.15
         };
         heartRate = 90 + Math.floor(Math.random() * 15);
         steps = 15 + Math.floor(Math.random() * 10);

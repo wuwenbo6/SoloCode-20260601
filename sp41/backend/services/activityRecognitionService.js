@@ -283,8 +283,13 @@ class ActivityRecognitionService {
       }
 
       if (magnitude > 1.0 && magnitude < 2.0 && features.stepsDelta === 0) {
-        scores[ACTIVITY_TYPES.CYCLING] += 25;
-        scores[ACTIVITY_TYPES.SWIMMING] -= 10;
+        if (features.accelerometer.z < -0.2) {
+          scores[ACTIVITY_TYPES.SWIMMING] += 35;
+          scores[ACTIVITY_TYPES.CYCLING] -= 10;
+        } else {
+          scores[ACTIVITY_TYPES.CYCLING] += 25;
+          scores[ACTIVITY_TYPES.SWIMMING] -= 10;
+        }
       }
 
       if (peakFrequency > 2.5) {
@@ -296,7 +301,7 @@ class ActivityRecognitionService {
         scores[ACTIVITY_TYPES.CYCLING] += 15;
       }
 
-      if (features.accelerometer.z < -0.5 && deltaMagnitude > 0.3) {
+      if (features.accelerometer.z < -0.2 && deltaMagnitude > 0.3) {
         scores[ACTIVITY_TYPES.SWIMMING] += 40;
         scores[ACTIVITY_TYPES.CYCLING] -= 15;
       }
