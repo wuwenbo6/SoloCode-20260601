@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package broadcast;
+
+option go_package = "recommendation-system/api/proto/broadcast";
+
+service CacheBroadcastService {
+  rpc NotifyCacheUpdate(CacheUpdateRequest) returns (CacheUpdateResponse) {}
+}
+
+enum CacheType {
+  UNKNOWN = 0;
+  USER = 1;
+  PRODUCT = 2;
+  RECOMMENDATION = 3;
+  BROWSE_HISTORY = 4;
+}
+
+message CacheUpdateRequest {
+  CacheType cache_type = 1;
+  string key = 2;
+  OperationType operation = 3;
+  int64 timestamp = 4;
+}
+
+enum OperationType {
+  OPERATION_UNKNOWN = 0;
+  CREATE = 1;
+  UPDATE = 2;
+  DELETE = 3;
+  INVALIDATE = 4;
+}
+
+message CacheUpdateResponse {
+  bool success = 1;
+}

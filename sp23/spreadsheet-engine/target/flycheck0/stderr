@@ -1,0 +1,10 @@
+    Updating crates.io index
+error: failed to select a version for `calamine`.
+    ... required by package `spreadsheet-engine v0.1.0 (/Users/wuwenbo/Documents/trae_projects/SoloCode-20260601/sp23/spreadsheet-engine)`
+versions that meet the requirements `^0.22` are: 0.22.1, 0.22.0
+
+package `spreadsheet-engine` depends on `calamine` with feature `xlsx` but `calamine` does not have that feature.
+ available features: chrono, dates, default, once_cell, picture
+
+
+failed to select a version for `calamine` which could resolve this conflict

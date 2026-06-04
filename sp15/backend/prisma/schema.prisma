@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  AUTHOR
+  ADMIN
+}
+
+enum PostStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+}
+
+enum CommentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  name      String
+  role      UserRole  @default(AUTHOR)
+  posts     Post[]
+  comments  Comment[]
+  createdAt DateTime  @default(now())
+}
+
+model Post {
+  id                 String         @id @default(cuid())
+  title              String
+  content            String
+  tags               String[]
+  status             PostStatus     @default(DRAFT)
+  scheduledPublishAt DateTime?
+  authorId           String
+  author             User           @relation(fields: [authorId], references: [id])
+  versions           PostVersion[]
+  comments           Comment[]
+  searchVector       Unsupported("tsvector")?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([searchVector], type: Gin)
+}
+
+model PostVersion {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id])
+  title     String
+  content   String
+  tags      String[]
+  version   Int
+  createdAt DateTime @default(now())
+}
+
+model Comment {
+  id         String         @id @default(cuid())
+  content    String
+  status     CommentStatus  @default(PENDING)
+  postId     String
+  post       Post           @relation(fields: [postId], references: [id])
+  authorId   String
+  author     User           @relation(fields: [authorId], references: [id])
+  parentId   String?
+  parent     Comment?       @relation("CommentReplies", fields: [parentId], references: [id])
+  replies    Comment[]      @relation("CommentReplies")
+  reactions  CommentReaction[]
+  createdAt  DateTime       @default(now())
+}
+
+enum ReactionType {
+  LIKE
+  DISLIKE
+}
+
+model CommentReaction {
+  id        String       @id @default(cuid())
+  type      ReactionType
+  commentId String
+  comment   Comment      @relation(fields: [commentId], references: [id])
+  authorId  String
+  author    User         @relation(fields: [authorId], references: [id])
+  createdAt DateTime     @default(now())
+
+  @@unique([commentId, authorId])
+}

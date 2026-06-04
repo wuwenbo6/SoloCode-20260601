@@ -1,0 +1,10 @@
+/Users/wuwenbo/Documents/trae_projects/SoloCode-20260601/sp14/src-tauri/target/debug/deps/lofty_attr-1b566a916043c01d.d: /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/lib.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/attribute.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/internal.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/lofty_file.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/lofty_tag.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/util.rs
+
+/Users/wuwenbo/Documents/trae_projects/SoloCode-20260601/sp14/src-tauri/target/debug/deps/liblofty_attr-1b566a916043c01d.dylib: /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/lib.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/attribute.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/internal.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/lofty_file.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/lofty_tag.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/util.rs
+
+/Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/lib.rs:
+/Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/attribute.rs:
+/Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/internal.rs:
+/Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/lofty_file.rs:
+/Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/lofty_tag.rs:
+/Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lofty_attr-0.11.1/src/util.rs:

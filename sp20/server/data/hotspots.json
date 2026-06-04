@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "position": { "x": -5, "y": 1.5, "z": 5 },
+    "exhibitId": 1,
+    "label": "青铜器"
+  },
+  {
+    "id": 2,
+    "position": { "x": 5, "y": 1.5, "z": 5 },
+    "exhibitId": 2,
+    "label": "青花瓷"
+  },
+  {
+    "id": 3,
+    "position": { "x": -5, "y": 1.5, "z": -5 },
+    "exhibitId": 3,
+    "label": "埃及雕塑"
+  },
+  {
+    "id": 4,
+    "position": { "x": 5, "y": 1.5, "z": -5 },
+    "exhibitId": 4,
+    "label": "印象派油画"
+  }
+]

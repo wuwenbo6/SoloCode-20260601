@@ -1,0 +1,27 @@
+[
+  {
+    "id": "mpwdm7v5vtpziky6p",
+    "name": "默认涡流",
+    "createdAt": 1780388957777,
+    "params": {
+      "particleCount": 50000,
+      "particleSize": 2,
+      "gravityStrength": 50,
+      "gravityRadius": 300,
+      "repulsionStrength": 0,
+      "repulsionRadius": 100,
+      "vortexStrength": 30,
+      "vortexRadius": 200,
+      "mouseStrength": 500,
+      "mouseRadius": 150,
+      "damping": 0.995,
+      "bounceDamping": 0.8,
+      "colorMode": "velocity",
+      "baseColor": [
+        0,
+        0.94,
+        1
+      ]
+    }
+  }
+]

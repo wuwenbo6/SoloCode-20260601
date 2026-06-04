@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MPLS L2VPN 模拟器 - VPWS & VCCV Ping</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @keyframes pulse-green {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+        }
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+        }
+        .status-up { animation: pulse-green 2s infinite; }
+        .status-down { animation: pulse-red 2s infinite; }
+        .ping-success { border-left: 4px solid #22c55e; }
+        .ping-fail { border-left: 4px solid #ef4444; }
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: #374151;
+            border-radius: 4px;
+            height: 6px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #22d3ee;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-cyan-400">MPLS L2VPN 模拟器</h1>
+                    <p class="text-gray-400 mt-1">VPWS 伪线配置 · VCCV LSP Ping · 摆幅校准</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="exportCalTable('json')" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition-colors text-sm flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        导出 JSON
+                    </button>
+                    <button onclick="exportCalTable('csv')" class="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-lg transition-colors text-sm flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        导出 CSV
+                    </button>
+                    <div class="text-right">
+                        <div class="text-sm text-gray-400">网络拓扑</div>
+                        <div class="text-cyan-400 font-mono text-sm">PE1 &lt;-- MPLS --&gt; PE2</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-1">
+                <div class="bg-gray-800 rounded-xl p-6 shadow-lg">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        伪线列表 (Pseudowires)
+                    </h2>
+                    <div id="pwList" class="space-y-3">
+                    </div>
+                    <button onclick="createNewPW()" class="mt-4 w-full bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        创建新伪线
+                    </button>
+                </div>
+
+                <div class="bg-gray-800 rounded-xl p-6 shadow-lg mt-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        摆幅校准
+                    </h2>
+                    <div id="calPanel">
+                        <div id="calNoPW" class="text-gray-500 text-sm text-center py-4">请先选择伪线</div>
+                        <div id="calControls" class="hidden space-y-4">
+                            <div>
+                                <label class="text-sm text-gray-400 flex justify-between">
+                                    <span>延迟基准 (Base Delay)</span>
+                                    <span id="delayBaseValue" class="text-cyan-400 font-mono">10ms</span>
+                                </label>
+                                <input type="range" id="delayBase" min="1" max="200" value="10" class="w-full mt-1" oninput="updateCalDisplay()">
+                            </div>
+                            <div>
+                                <label class="text-sm text-gray-400 flex justify-between">
+                                    <span>摆幅 (Swing Amplitude)</span>
+                                    <span id="delaySwingValue" class="text-amber-400 font-mono">5ms</span>
+                                </label>
+                                <input type="range" id="delaySwing" min="0" max="100" value="5" class="w-full mt-1" oninput="updateCalDisplay()">
+                            </div>
+                            <div>
+                                <label class="text-sm text-gray-400 flex justify-between">
+                                    <span>摆幅模式</span>
+                                </label>
+                                <select id="delayMode" class="w-full bg-gray-700 text-white py-2 px-3 rounded-lg text-sm mt-1" onchange="updateCalDisplay()">
+                                    <option value="fixed">固定 (Fixed)</option>
+                                    <option value="uniform">均匀分布 (Uniform)</option>
+                                    <option value="gaussian">高斯分布 (Gaussian)</option>
+                                    <option value="sine">正弦波 (Sine)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-sm text-gray-400 flex justify-between">
+                                    <span>抖动 (Jitter)</span>
+                                    <span id="jitterValue" class="text-purple-400 font-mono">0ms</span>
+                                </label>
+                                <input type="range" id="jitter" min="0" max="50" value="0" class="w-full mt-1" oninput="updateCalDisplay()">
+                            </div>
+                            <div class="border-t border-gray-700 pt-4">
+                                <label class="text-sm text-gray-400 flex justify-between">
+                                    <span>模拟丢包</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="lossEnabled" class="sr-only peer" onchange="updateCalDisplay()">
+                                        <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-red-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                                    </label>
+                                </label>
+                            </div>
+                            <div id="lossControls" class="hidden space-y-3">
+                                <div>
+                                    <label class="text-sm text-gray-400 flex justify-between">
+                                        <span>丢包率</span>
+                                        <span id="lossRateValue" class="text-red-400 font-mono">0%</span>
+                                    </label>
+                                    <input type="range" id="lossRate" min="0" max="100" value="0" class="w-full mt-1" oninput="updateCalDisplay()">
+                                </div>
+                                <div>
+                                    <label class="text-sm text-gray-400 flex justify-between">
+                                        <span>突发大小</span>
+                                        <span id="lossBurstValue" class="text-orange-400 font-mono">0</span>
+                                    </label>
+                                    <input type="range" id="lossBurst" min="0" max="10" value="0" class="w-full mt-1" oninput="updateCalDisplay()">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-sm text-gray-400 flex justify-between">
+                                    <span>Ping 间隔</span>
+                                    <span id="pingIntervalValue" class="text-green-400 font-mono">500ms</span>
+                                </label>
+                                <input type="range" id="pingInterval" min="100" max="3000" step="100" value="500" class="w-full mt-1" oninput="updateCalDisplay()">
+                            </div>
+                            <button onclick="applyCalibration()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg transition-colors">
+                                应用校准参数
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2">
+                <div id="pwDetail" class="hidden">
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-lg mb-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-xl font-semibold flex items-center">
+                                <svg class="w-5 h-5 mr-2 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                伪线详情
+                                <span id="pwIdBadge" class="ml-3 bg-cyan-600 text-white text-sm px-3 py-1 rounded-full">PW #1</span>
+                            </h2>
+                            <button id="toggleStatusBtn" onclick="togglePWStatus()" class="bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded-lg transition-colors text-sm">
+                                切换状态
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <div class="text-gray-400 text-sm">状态</div>
+                                <div id="detailStatus" class="text-2xl font-bold text-green-400">UP</div>
+                            </div>
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <div class="text-gray-400 text-sm">FEC 类型</div>
+                                <div id="detailFECType" class="text-2xl font-bold text-amber-400">FEC128</div>
+                            </div>
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <div class="text-gray-400 text-sm">本地标签 (PE1)</div>
+                                <div id="detailLocalLabel" class="text-2xl font-bold font-mono text-cyan-400">1001</div>
+                            </div>
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <div class="text-gray-400 text-sm">远端标签 (PE2)</div>
+                                <div id="detailRemoteLabel" class="text-2xl font-bold font-mono text-purple-400">2001</div>
+                            </div>
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <div class="text-gray-400 text-sm">VCCV 控制字</div>
+                                <div id="detailVCCV" class="text-2xl font-bold text-green-400">启用</div>
+                            </div>
+                        </div>
+                        <div id="fec129Info" class="hidden mt-4 bg-gray-700 rounded-lg p-4">
+                            <div class="text-sm text-gray-400 mb-2">FEC 129 标识 (Generalized PW ID)</div>
+                            <div class="grid grid-cols-3 gap-4 font-mono text-sm">
+                                <div>
+                                    <span class="text-gray-400">AGI:</span>
+                                    <span id="detailAGI" class="text-amber-300 ml-1">-</span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-400">SAII:</span>
+                                    <span id="detailSAII" class="text-cyan-300 ml-1">-</span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-400">TAII:</span>
+                                    <span id="detailTAII" class="text-purple-300 ml-1">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-lg mb-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-xl font-semibold flex items-center">
+                                <svg class="w-5 h-5 mr-2 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                                LSP Ping (VCCV)
+                            </h2>
+                            <div class="flex items-center space-x-2">
+                                <select id="pingCount" class="bg-gray-700 text-white py-2 px-3 rounded-lg text-sm">
+                                    <option value="1">1 次</option>
+                                    <option value="4" selected>4 次</option>
+                                    <option value="10">10 次</option>
+                                    <option value="20">20 次</option>
+                                </select>
+                                <button id="pingBtn" onclick="startPing()" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    开始 Ping
+                                </button>
+                                <button onclick="clearResults()" class="bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition-colors text-sm">
+                                    清除
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-900 rounded-lg p-4 mb-4 h-64 overflow-y-auto font-mono text-sm" id="pingLog">
+                            <div class="text-gray-500">等待 LSP Ping 测试...</div>
+                        </div>
+
+                        <div class="bg-gray-700 rounded-lg p-4">
+                            <canvas id="rttChart" height="150"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-lg">
+                        <h2 class="text-xl font-semibold mb-4 flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Ping 统计
+                        </h2>
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                            <div class="text-center">
+                                <div class="text-gray-400 text-sm">已发送</div>
+                                <div id="statSent" class="text-3xl font-bold text-cyan-400">0</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-gray-400 text-sm">已接收</div>
+                                <div id="statReceived" class="text-3xl font-bold text-green-400">0</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-gray-400 text-sm">丢包率</div>
+                                <div id="statLoss" class="text-3xl font-bold text-yellow-400">0%</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-gray-400 text-sm">最小 RTT</div>
+                                <div id="statMin" class="text-3xl font-bold text-purple-400">0ms</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-gray-400 text-sm">平均 RTT</div>
+                                <div id="statAvg" class="text-3xl font-bold text-pink-400">0ms</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="placeholder" class="bg-gray-800 rounded-xl p-12 shadow-lg text-center">
+                    <svg class="w-24 h-24 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <p class="text-gray-400 text-lg">请从左侧选择一个伪线查看详情</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedPWId = null;
+        let selectedFECType = 'FEC128';
+        let rttChart = null;
+        let pingResults = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            loadPWList();
+        });
+
+        function initChart() {
+            const ctx = document.getElementById('rttChart').getContext('2d');
+            rttChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'RTT (ms)',
+                        data: [],
+                        borderColor: '#22d3ee',
+                        backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: '#22d3ee',
+                        pointBorderColor: '#fff',
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: '#9ca3af' }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: '#9ca3af' },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadPWList() {
+            try {
+                const res = await fetch('/api/pws');
+                const pws = await res.json();
+                renderPWList(pws);
+            } catch (e) {
+                console.error('Failed to load PW list:', e);
+            }
+        }
+
+        function renderPWList(pws) {
+            const container = document.getElementById('pwList');
+            container.innerHTML = '';
+
+            pws.forEach(pw => {
+                const isUp = pw.status === 'UP';
+                const div = document.createElement('div');
+                div.className = `bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600 transition-all ${selectedPWId === pw.id ? 'ring-2 ring-cyan-400' : ''}`;
+                div.onclick = () => selectPW(pw.id);
+                div.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="font-semibold">PW #${pw.id} <span class="text-xs ${pw.fec_type === 'FEC129' ? 'text-amber-400' : 'text-blue-400'} font-mono">${pw.fec_type || 'FEC128'}</span></div>
+                            <div class="text-sm text-gray-400 font-mono">${pw.local_label} &rarr; ${pw.remote_label}</div>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isUp ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                <span class="w-2 h-2 mr-1.5 rounded-full ${isUp ? 'bg-green-500' : 'bg-red-500'} ${isUp ? 'status-up' : 'status-down'}"></span>
+                                ${pw.status}
+                            </span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        async function selectPW(id) {
+            selectedPWId = id;
+            loadPWList();
+
+            try {
+                const res = await fetch(`/api/pws/${id}`);
+                const pw = await res.json();
+                showPWDetail(pw);
+                loadPingResults(id);
+                loadCalProfile(id);
+            } catch (e) {
+                console.error('Failed to load PW detail:', e);
+            }
+        }
+
+        function showPWDetail(pw) {
+            document.getElementById('placeholder').classList.add('hidden');
+            document.getElementById('pwDetail').classList.remove('hidden');
+
+            const isUp = pw.status === 'UP';
+
+            document.getElementById('pwIdBadge').textContent = `PW #${pw.id}`;
+            document.getElementById('detailStatus').textContent = pw.status;
+            document.getElementById('detailStatus').className = `text-2xl font-bold ${isUp ? 'text-green-400' : 'text-red-400'}`;
+            document.getElementById('detailFECType').textContent = pw.fec_type || 'FEC128';
+            document.getElementById('detailFECType').className = `text-2xl font-bold ${pw.fec_type === 'FEC129' ? 'text-amber-400' : 'text-blue-400'}`;
+            selectedFECType = pw.fec_type || 'FEC128';
+            document.getElementById('detailLocalLabel').textContent = pw.local_label;
+            document.getElementById('detailRemoteLabel').textContent = pw.remote_label;
+            document.getElementById('detailVCCV').textContent = pw.vccv_enabled ? '启用' : '禁用';
+            document.getElementById('detailVCCV').className = `text-2xl font-bold ${pw.vccv_enabled ? 'text-green-400' : 'text-red-400'}`;
+
+            const fec129Info = document.getElementById('fec129Info');
+            if (pw.fec_type === 'FEC129') {
+                fec129Info.classList.remove('hidden');
+                document.getElementById('detailAGI').textContent = pw.agi || '-';
+                document.getElementById('detailSAII').textContent = pw.saii || '-';
+                document.getElementById('detailTAII').textContent = pw.taii || '-';
+            } else {
+                fec129Info.classList.add('hidden');
+            }
+
+            document.getElementById('toggleStatusBtn').textContent = isUp ? '关闭伪线' : '启用伪线';
+            document.getElementById('toggleStatusBtn').className = isUp 
+                ? 'bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition-colors text-sm'
+                : 'bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition-colors text-sm';
+        }
+
+        async function loadCalProfile(pwId) {
+            try {
+                const res = await fetch(`/api/pws/${pwId}/calibration`);
+                if (!res.ok) return;
+                const cal = await res.json();
+
+                document.getElementById('calNoPW').classList.add('hidden');
+                document.getElementById('calControls').classList.remove('hidden');
+
+                document.getElementById('delayBase').value = cal.delay.base_ms;
+                document.getElementById('delaySwing').value = cal.delay.swing_ms;
+                document.getElementById('delayMode').value = cal.delay.mode;
+                document.getElementById('jitter').value = cal.delay.jitter_ms;
+                document.getElementById('lossEnabled').checked = cal.loss.enabled;
+                document.getElementById('lossRate').value = Math.round(cal.loss.rate * 100);
+                document.getElementById('lossBurst').value = cal.loss.burst_size;
+                document.getElementById('pingInterval').value = cal.ping_interval_ms;
+
+                updateCalDisplay();
+            } catch (e) {
+                console.error('Failed to load calibration profile:', e);
+            }
+        }
+
+        function updateCalDisplay() {
+            const base = document.getElementById('delayBase').value;
+            const swing = document.getElementById('delaySwing').value;
+            const mode = document.getElementById('delayMode').value;
+            const jitter = document.getElementById('jitter').value;
+            const lossEnabled = document.getElementById('lossEnabled').checked;
+            const lossRate = document.getElementById('lossRate').value;
+            const lossBurst = document.getElementById('lossBurst').value;
+            const interval = document.getElementById('pingInterval').value;
+
+            document.getElementById('delayBaseValue').textContent = `${base}ms`;
+            document.getElementById('delaySwingValue').textContent = `${swing}ms`;
+            document.getElementById('jitterValue').textContent = `${jitter}ms`;
+            document.getElementById('lossRateValue').textContent = `${lossRate}%`;
+            document.getElementById('lossBurstValue').textContent = lossBurst;
+            document.getElementById('pingIntervalValue').textContent = `${interval}ms`;
+
+            const lossControls = document.getElementById('lossControls');
+            if (lossEnabled) {
+                lossControls.classList.remove('hidden');
+            } else {
+                lossControls.classList.add('hidden');
+            }
+        }
+
+        async function applyCalibration() {
+            if (!selectedPWId) return;
+
+            const base = parseInt(document.getElementById('delayBase').value);
+            const swing = parseInt(document.getElementById('delaySwing').value);
+            const mode = document.getElementById('delayMode').value;
+            const jitter = parseInt(document.getElementById('jitter').value);
+            const lossEnabled = document.getElementById('lossEnabled').checked;
+            const lossRate = parseInt(document.getElementById('lossRate').value) / 100;
+            const lossBurst = parseInt(document.getElementById('lossBurst').value);
+            const interval = parseInt(document.getElementById('pingInterval').value);
+
+            try {
+                await fetch(`/api/pws/${selectedPWId}/calibration`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        delay: {
+                            base_ms: base,
+                            swing_ms: swing,
+                            mode: mode,
+                            jitter_ms: jitter
+                        },
+                        loss: {
+                            enabled: lossEnabled,
+                            rate: lossRate,
+                            burst_size: lossBurst
+                        },
+                        ping_interval_ms: interval
+                    })
+                });
+
+                const btn = document.querySelector('#calControls button');
+                const origText = btn.textContent;
+                btn.textContent = '已应用 ✓';
+                btn.className = 'w-full bg-green-600 text-white py-2 px-4 rounded-lg transition-colors';
+                setTimeout(() => {
+                    btn.textContent = origText;
+                    btn.className = 'w-full bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg transition-colors';
+                }, 1500);
+            } catch (e) {
+                alert('应用失败: ' + e.message);
+            }
+        }
+
+        async function exportCalTable(format) {
+            try {
+                const res = await fetch(`/api/calibration/export?format=${format}`);
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `calibration_table.${format}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                alert('导出失败: ' + e.message);
+            }
+        }
+
+        async function togglePWStatus() {
+            if (!selectedPWId) return;
+            try {
+                const res = await fetch(`/api/pws/${selectedPWId}/toggle`, { method: 'POST' });
+                const pw = await res.json();
+                showPWDetail(pw);
+                loadPWList();
+            } catch (e) {
+                console.error('Failed to toggle PW status:', e);
+            }
+        }
+
+        async function startPing() {
+            if (!selectedPWId) return;
+
+            const count = parseInt(document.getElementById('pingCount').value);
+            const btn = document.getElementById('pingBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<svg class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Ping 中...';
+
+            const log = document.getElementById('pingLog');
+            const mode = document.getElementById('delayMode').value;
+            const swing = document.getElementById('delaySwing').value;
+            const base = document.getElementById('delayBase').value;
+            log.innerHTML = `<div class="text-cyan-400">发送 ${count} 个 LSP Echo Request (VCCV ${selectedFECType})...</div><div class="text-gray-500">校准参数: base=${base}ms swing=±${swing}ms mode=${mode}</div>`;
+
+            try {
+                const res = await fetch(`/api/pws/${selectedPWId}/ping`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ count })
+                });
+                const results = await res.json();
+                displayPingResults(results);
+                updateStats(results);
+                updateChart(results);
+            } catch (e) {
+                log.innerHTML += `<div class="text-red-400">Ping 失败: ${e.message}</div>`;
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>开始 Ping';
+        }
+
+        function displayPingResults(results) {
+            const log = document.getElementById('pingLog');
+            log.innerHTML = '';
+
+            results.forEach((r, i) => {
+                const div = document.createElement('div');
+                div.className = `py-1 px-2 rounded ${r.success ? 'ping-success text-green-400' : 'ping-fail text-red-400'}`;
+                
+                if (r.success) {
+                    div.textContent = `[${i + 1}] Reply from PW [${r.fec_type || 'FEC128'}]: seq=${r.sequence_number}, time=${r.rtt_string}, FEC validated`;
+                } else {
+                    div.textContent = `[${i + 1}] Request failed [${r.fec_type || 'FEC128'}]: ${r.error || '未知错误'} (rc=${r.return_code})`;
+                }
+                log.appendChild(div);
+            });
+
+            const successCount = results.filter(r => r.success).length;
+            const summary = document.createElement('div');
+            summary.className = 'mt-2 pt-2 border-t border-gray-700 text-gray-300';
+            summary.textContent = `--- Ping 统计 --- ${results.length} packets transmitted, ${successCount} received, ${((results.length - successCount) / results.length * 100).toFixed(1)}% packet loss`;
+            log.appendChild(summary);
+        }
+
+        function updateStats(results) {
+            pingResults = [...pingResults, ...results].slice(-50);
+
+            const sent = pingResults.length;
+            const received = pingResults.filter(r => r.success).length;
+            const loss = sent > 0 ? ((sent - received) / sent * 100).toFixed(1) : 0;
+
+            const rtts = pingResults.filter(r => r.success && r.rtt_ms > 0).map(r => r.rtt_ms);
+            const minRtt = rtts.length > 0 ? Math.min(...rtts) : 0;
+            const avgRtt = rtts.length > 0 ? Math.round(rtts.reduce((a, b) => a + b, 0) / rtts.length) : 0;
+
+            document.getElementById('statSent').textContent = sent;
+            document.getElementById('statReceived').textContent = received;
+            document.getElementById('statLoss').textContent = `${loss}%`;
+            document.getElementById('statLoss').className = `text-3xl font-bold ${parseFloat(loss) > 0 ? 'text-red-400' : 'text-green-400'}`;
+            document.getElementById('statMin').textContent = `${minRtt}ms`;
+            document.getElementById('statAvg').textContent = `${avgRtt}ms`;
+        }
+
+        function updateChart(results) {
+            const newResults = results.slice(-20);
+            rttChart.data.labels = newResults.map((r, i) => `#${r.sequence_number}`);
+            rttChart.data.datasets[0].data = newResults.map(r => r.success ? r.rtt_ms : null);
+            rttChart.update();
+        }
+
+        async function loadPingResults(pwId) {
+            try {
+                const res = await fetch(`/api/pws/${pwId}/ping-results`);
+                const results = await res.json();
+                if (results.length > 0) {
+                    displayPingResults(results.slice(-10));
+                    pingResults = results;
+                    updateStats([]);
+                    updateChart(results.slice(-20));
+                } else {
+                    pingResults = [];
+                    document.getElementById('pingLog').innerHTML = '<div class="text-gray-500">等待 LSP Ping 测试...</div>';
+                    updateStats([]);
+                    updateChart([]);
+                }
+            } catch (e) {
+                console.error('Failed to load ping results:', e);
+            }
+        }
+
+        async function clearResults() {
+            if (!selectedPWId) return;
+            await fetch(`/api/pws/${selectedPWId}/ping-results`, { method: 'DELETE' });
+            pingResults = [];
+            document.getElementById('pingLog').innerHTML = '<div class="text-gray-500">等待 LSP Ping 测试...</div>';
+            updateStats([]);
+            updateChart([]);
+        }
+
+        async function createNewPW() {
+            const id = prompt('请输入伪线ID:', '4');
+            if (!id) return;
+            
+            const localLabel = prompt('请输入本地标签 (PE1):', '1004');
+            if (!localLabel) return;
+            
+            const remoteLabel = prompt('请输入远端标签 (PE2):', '2004');
+            if (!remoteLabel) return;
+
+            const fecType = prompt('FEC类型 (FEC128 或 FEC129):', 'FEC128');
+            if (!fecType) return;
+
+            let agi = '', saii = '', taii = '';
+            if (fecType.toUpperCase() === 'FEC129') {
+                agi = prompt('请输入 AGI (Attachment Group Identifier):', 'vpn-agi-001');
+                saii = prompt('请输入 SAII (Source Attachment Individual Identifier):', 'pe1-ac1');
+                taii = prompt('请输入 TAII (Target Attachment Individual Identifier):', 'pe2-ac1');
+            }
+
+            try {
+                await fetch('/api/pws', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pw_id: parseInt(id),
+                        local_label: parseInt(localLabel),
+                        remote_label: parseInt(remoteLabel),
+                        fec_type: fecType.toUpperCase(),
+                        agi: agi,
+                        saii: saii,
+                        taii: taii
+                    })
+                });
+                loadPWList();
+            } catch (e) {
+                alert('创建失败: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>

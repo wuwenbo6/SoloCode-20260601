@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Room {
+  id        String    @id @default(uuid())
+  name      String
+  password  String?
+  hostId    String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  users     User[]
+  versions  Version[]
+}
+
+model User {
+  id        String    @id @default(uuid())
+  nickname  String
+  color     String
+  roomId    String
+  room      Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  isHost    Boolean   @default(false)
+  joinedAt  DateTime  @default(now())
+  versions  Version[]
+}
+
+model Version {
+  id         String   @id @default(uuid())
+  roomId     String
+  room       Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  content    String   @db.Text
+  createdBy  String
+  user       User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  autoSaved  Boolean  @default(false)
+  message    String?
+
+  @@index([roomId])
+  @@index([createdAt(sort: Desc)])
+}

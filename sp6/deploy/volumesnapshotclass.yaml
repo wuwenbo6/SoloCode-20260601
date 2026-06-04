@@ -1,0 +1,8 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: mock-snapshot-class
+driver: mock.csi.k8s.io
+deletionPolicy: Delete
+parameters:
+  type: mock

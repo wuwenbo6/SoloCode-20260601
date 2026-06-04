@@ -1,0 +1,131 @@
+syntax = "proto3";
+
+package product;
+
+option go_package = "recommendation-system/api/proto/product";
+
+import "google/api/annotations.proto";
+
+service ProductService {
+  rpc GetProduct(GetProductRequest) returns (Product) {
+    option (google.api.http) = {
+      get: "/v1/products/{product_id}"
+    };
+  }
+
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse) {
+    option (google.api.http) = {
+      get: "/v1/products"
+    };
+  }
+
+  rpc CreateProduct(CreateProductRequest) returns (Product) {
+    option (google.api.http) = {
+      post: "/v1/products"
+      body: "*"
+    };
+  }
+
+  rpc UpdateProduct(UpdateProductRequest) returns (Product) {
+    option (google.api.http) = {
+      put: "/v1/products/{product_id}"
+      body: "*"
+    };
+  }
+
+  rpc DeleteProduct(DeleteProductRequest) returns (DeleteProductResponse) {
+    option (google.api.http) = {
+      delete: "/v1/products/{product_id}"
+    };
+  }
+
+  rpc GetHotProducts(GetHotProductsRequest) returns (GetHotProductsResponse) {
+    option (google.api.http) = {
+      get: "/v1/products/hot"
+    };
+  }
+
+  rpc IncrementViewCount(IncrementViewCountRequest) returns (IncrementViewCountResponse) {
+    option (google.api.http) = {
+      post: "/v1/products/{product_id}/view"
+      body: "*"
+    };
+  }
+
+  rpc GetProducts(GetProductsRequest) returns (GetProductsResponse) {}
+}
+
+message Product {
+  int64 product_id = 1;
+  string name = 2;
+  string description = 3;
+  double price = 4;
+  string category = 5;
+  int64 view_count = 6;
+  double hot_score = 7;
+  int64 created_at = 8;
+  int64 updated_at = 9;
+}
+
+message GetProductRequest {
+  int64 product_id = 1;
+}
+
+message ListProductsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string category = 3;
+}
+
+message ListProductsResponse {
+  repeated Product products = 1;
+  int32 total = 2;
+}
+
+message CreateProductRequest {
+  string name = 1;
+  string description = 2;
+  double price = 3;
+  string category = 4;
+}
+
+message UpdateProductRequest {
+  int64 product_id = 1;
+  string name = 2;
+  string description = 3;
+  double price = 4;
+  string category = 5;
+}
+
+message DeleteProductRequest {
+  int64 product_id = 1;
+}
+
+message DeleteProductResponse {
+  bool success = 1;
+}
+
+message GetHotProductsRequest {
+  int32 limit = 1;
+  string category = 2;
+}
+
+message GetHotProductsResponse {
+  repeated Product products = 1;
+}
+
+message IncrementViewCountRequest {
+  int64 product_id = 1;
+}
+
+message IncrementViewCountResponse {
+  bool success = 1;
+}
+
+message GetProductsRequest {
+  repeated int64 product_ids = 1;
+}
+
+message GetProductsResponse {
+  repeated Product products = 1;
+}

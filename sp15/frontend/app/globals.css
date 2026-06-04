@@ -1,0 +1,205 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+nav {
+  background: #2563eb;
+  color: white;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+nav a {
+  color: white;
+  text-decoration: none;
+  margin-right: 1.5rem;
+}
+
+nav a:hover {
+  text-decoration: underline;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button.primary {
+  background: #2563eb;
+  color: white;
+}
+
+button.danger {
+  background: #dc2626;
+  color: white;
+}
+
+button.success {
+  background: #16a34a;
+  color: white;
+}
+
+button.secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.card {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-group textarea {
+  min-height: 150px;
+  resize: vertical;
+}
+
+.tag {
+  display: inline-block;
+  background: #e0e7ff;
+  color: #4338ca;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 12px;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-draft {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-pending {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-published {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.comment {
+  border-left: 3px solid #2563eb;
+  padding-left: 1rem;
+  margin: 1rem 0;
+}
+
+.comment-author {
+  font-weight: 500;
+  color: #2563eb;
+}
+
+.comment-date {
+  font-size: 12px;
+  color: #666;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.diff-added {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.diff-removed {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.diff-line-number {
+  font-family: monospace;
+  font-size: 12px;
+  color: #999;
+  text-align: right;
+  user-select: none;
+  padding: 0 8px;
+  border-right: 1px solid #e5e7eb;
+  min-width: 40px;
+}
+
+.diff-content {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.diff-container {
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  overflow: auto;
+  max-height: 500px;
+}
+
+.diff-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.diff-stat-added {
+  background: #dcfce7;
+  color: #166534;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.diff-stat-removed {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 2px 8px;
+  border-radius: 4px;
+}

@@ -1,0 +1,189 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 160 84% 39%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 217 91% 60%;
+    --radius: 0.75rem;
+  }
+  
+  * {
+    @apply border-border;
+  }
+  html,
+  body {
+    @apply bg-dark-900 text-white;
+  }
+  body {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    min-height: 100vh;
+    background-image: 
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59,130,246,0.15), transparent),
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 40px 40px, 40px 40px;
+    background-attachment: fixed;
+  }
+  :root {
+    color-scheme: dark;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply backdrop-blur-xl rounded-2xl;
+    background-color: rgba(18, 18, 26, 0.8);
+    border: 1px solid rgba(37, 37, 50, 0.5);
+    box-shadow: 
+      0 4px 6px -1px rgba(0, 0, 0, 0.3),
+      0 2px 4px -2px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  
+  .glass-card-hover {
+    @apply transition-all duration-300;
+  }
+  
+  .glass-card-hover:hover {
+    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 
+      0 20px 25px -5px rgba(59, 130, 246, 0.1),
+      0 8px 10px -6px rgba(59, 130, 246, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  
+  .btn-primary {
+    @apply px-6 py-3 bg-primary-600 hover:bg-primary-500 text-white font-semibold rounded-xl
+           transition-all duration-300 transform hover:scale-105 active:scale-95;
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+  }
+  
+  .btn-primary:hover {
+    box-shadow: 0 20px 25px -5px rgba(59, 130, 246, 0.4);
+  }
+  
+  .btn-secondary {
+    @apply px-6 py-3 text-white font-semibold rounded-xl
+           transition-all duration-300 border;
+    background-color: rgba(37, 37, 50, 1);
+    border-color: rgba(50, 50, 74, 1);
+  }
+  
+  .btn-secondary:hover {
+    background-color: rgba(50, 50, 74, 1);
+    border-color: rgba(80, 80, 100, 1);
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl text-white transition-all duration-200;
+    background-color: rgba(26, 26, 37, 0.5);
+    border: 1px solid rgba(50, 50, 74, 1);
+  }
+  
+  .input-field::placeholder {
+    color: rgba(50, 50, 74, 1);
+  }
+  
+  .input-field:focus {
+    @apply outline-none;
+    border-color: rgba(59, 130, 246, 1);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  }
+  
+  .stat-card {
+    @apply relative overflow-hidden glass-card p-6;
+  }
+  
+  .stat-card::before {
+    content: '';
+    @apply absolute top-0 left-0 right-0 h-1;
+    background: linear-gradient(to right, #3b82f6, #10b981, #f59e0b);
+  }
+  
+  .code-block {
+    @apply font-mono text-sm rounded-lg px-3 py-2;
+    background-color: rgba(10, 10, 15, 0.8);
+    border: 1px solid rgba(37, 37, 50, 1);
+  }
+  
+  .srh-segment {
+    @apply relative flex items-center justify-between p-4 rounded-xl transition-all duration-300;
+    background-color: rgba(26, 26, 37, 0.5);
+    border: 1px solid rgba(50, 50, 74, 0.5);
+  }
+  
+  .srh-segment:hover {
+    border-color: rgba(59, 130, 246, 0.3);
+    background-color: rgba(26, 26, 37, 0.8);
+  }
+  
+  .sid-item {
+    @apply relative p-4 rounded-xl border transition-all duration-300 cursor-default;
+    background-color: rgba(26, 26, 37, 0.3);
+    border-color: rgba(50, 50, 74, 0.3);
+  }
+  
+  .sid-item:hover {
+    background-color: rgba(26, 26, 37, 0.6);
+    border-color: rgba(80, 80, 100, 0.5);
+  }
+  
+  .sid-item.compressed {
+    border-color: rgba(16, 185, 129, 0.4);
+    background-color: rgba(16, 185, 129, 0.05);
+  }
+  
+  .sid-item.compressed:hover {
+    border-color: rgba(16, 185, 129, 0.6);
+    background-color: rgba(16, 185, 129, 0.1);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(to right, #60a5fa, #10b981, #f59e0b);
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply rounded-full;
+    background-color: rgba(18, 18, 26, 1);
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply rounded-full transition-colors;
+    background-color: rgba(50, 50, 74, 1);
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(80, 80, 100, 1);
+  }
+}

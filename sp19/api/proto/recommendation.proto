@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package recommendation;
+
+option go_package = "recommendation-system/api/proto/recommendation";
+
+import "google/api/annotations.proto";
+import "product.proto";
+
+service RecommendationService {
+  rpc GetRecommendations(GetRecommendationsRequest) returns (GetRecommendationsResponse) {
+    option (google.api.http) = {
+      get: "/v1/recommendations/{user_id}"
+    };
+  }
+
+  rpc StreamRecommendations(StreamRecommendationsRequest) returns (stream GetRecommendationsResponse) {}
+
+  rpc RecordClick(RecordClickRequest) returns (RecordClickResponse) {
+    option (google.api.http) = {
+      post: "/v1/recommendations/{user_id}/click"
+      body: "*"
+    };
+  }
+}
+
+message GetRecommendationsRequest {
+  int64 user_id = 1;
+  int32 limit = 2;
+  string algorithm = 3;
+}
+
+message RecommendedProduct {
+  product.Product product = 1;
+  string reason = 2;
+  double score = 3;
+}
+
+message GetRecommendationsResponse {
+  repeated RecommendedProduct recommendations = 1;
+  string algorithm_used = 2;
+  string experiment_group = 3;
+  int64 request_id = 4;
+  bool is_fallback = 5;
+}
+
+message StreamRecommendationsRequest {
+  int64 user_id = 1;
+  int32 limit = 2;
+}
+
+message RecordClickRequest {
+  int64 user_id = 1;
+  int64 product_id = 2;
+  int64 request_id = 3;
+}
+
+message RecordClickResponse {
+  bool success = 1;
+}

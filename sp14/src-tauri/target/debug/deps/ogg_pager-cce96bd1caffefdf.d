@@ -1,0 +1,10 @@
+/Users/wuwenbo/Documents/trae_projects/SoloCode-20260601/sp14/src-tauri/target/debug/deps/ogg_pager-cce96bd1caffefdf.d: /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/lib.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/crc.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/error.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/header.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/packets.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/paginate.rs
+
+/Users/wuwenbo/Documents/trae_projects/SoloCode-20260601/sp14/src-tauri/target/debug/deps/libogg_pager-cce96bd1caffefdf.rmeta: /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/lib.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/crc.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/error.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/header.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/packets.rs /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/paginate.rs
+
+/Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/lib.rs:
+/Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/crc.rs:
+/Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/error.rs:
+/Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/header.rs:
+/Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/packets.rs:
+/Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ogg_pager-0.6.1/src/paginate.rs:

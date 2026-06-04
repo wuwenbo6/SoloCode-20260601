@@ -1,0 +1,135 @@
+syntax = "proto3";
+
+package abtest;
+
+option go_package = "recommendation-system/api/proto/abtest";
+
+import "google/api/annotations.proto";
+
+service ABTestService {
+  rpc GetUserGroup(GetUserGroupRequest) returns (GetUserGroupResponse) {
+    option (google.api.http) = {
+      get: "/v1/abtest/{experiment_id}/group/{user_id}"
+    };
+  }
+
+  rpc CreateExperiment(CreateExperimentRequest) returns (Experiment) {
+    option (google.api.http) = {
+      post: "/v1/abtest/experiments"
+      body: "*"
+    };
+  }
+
+  rpc GetExperiment(GetExperimentRequest) returns (Experiment) {
+    option (google.api.http) = {
+      get: "/v1/abtest/experiments/{experiment_id}"
+    };
+  }
+
+  rpc ListExperiments(ListExperimentsRequest) returns (ListExperimentsResponse) {
+    option (google.api.http) = {
+      get: "/v1/abtest/experiments"
+    };
+  }
+
+  rpc RecordClick(RecordClickRequest) returns (RecordClickResponse) {}
+
+  rpc RecordImpression(RecordImpressionRequest) returns (RecordImpressionResponse) {}
+
+  rpc GetExperimentStats(GetExperimentStatsRequest) returns (GetExperimentStatsResponse) {
+    option (google.api.http) = {
+      get: "/v1/abtest/experiments/{experiment_id}/stats"
+    };
+  }
+}
+
+message Experiment {
+  string experiment_id = 1;
+  string name = 2;
+  string description = 3;
+  repeated Group groups = 4;
+  bool enabled = 5;
+  int64 created_at = 6;
+  int64 updated_at = 7;
+}
+
+message Group {
+  string group_id = 1;
+  string name = 2;
+  int32 traffic_percentage = 3;
+  map<string, string> variables = 4;
+}
+
+message GetUserGroupRequest {
+  string experiment_id = 1;
+  int64 user_id = 2;
+}
+
+message GetUserGroupResponse {
+  string group_id = 1;
+  string group_name = 2;
+  map<string, string> variables = 3;
+  bool in_experiment = 4;
+}
+
+message CreateExperimentRequest {
+  string name = 1;
+  string description = 2;
+  repeated Group groups = 3;
+}
+
+message GetExperimentRequest {
+  string experiment_id = 1;
+}
+
+message ListExperimentsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+}
+
+message ListExperimentsResponse {
+  repeated Experiment experiments = 1;
+  int32 total = 2;
+}
+
+message RecordClickRequest {
+  string experiment_id = 1;
+  int64 user_id = 2;
+  string group_id = 3;
+  int64 product_id = 4;
+  int64 request_id = 5;
+}
+
+message RecordClickResponse {
+  bool success = 1;
+}
+
+message RecordImpressionRequest {
+  string experiment_id = 1;
+  int64 user_id = 2;
+  string group_id = 3;
+  repeated int64 product_ids = 4;
+  int64 request_id = 5;
+}
+
+message RecordImpressionResponse {
+  bool success = 1;
+}
+
+message GroupStats {
+  string group_id = 1;
+  string group_name = 2;
+  int64 impressions = 3;
+  int64 clicks = 4;
+  double ctr = 5;
+}
+
+message GetExperimentStatsRequest {
+  string experiment_id = 1;
+}
+
+message GetExperimentStatsResponse {
+  string experiment_id = 1;
+  repeated GroupStats group_stats = 2;
+  int64 timestamp = 3;
+}

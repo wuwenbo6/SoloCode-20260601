@@ -1,0 +1,5 @@
+/Users/wuwenbo/Documents/trae_projects/SoloCode-20260601/sp14/src-tauri/target/debug/build/wry-85ab37ec316721c3/build_script_build-85ab37ec316721c3.d: /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wry-0.55.1/build.rs
+
+/Users/wuwenbo/Documents/trae_projects/SoloCode-20260601/sp14/src-tauri/target/debug/build/wry-85ab37ec316721c3/build_script_build-85ab37ec316721c3: /Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wry-0.55.1/build.rs
+
+/Users/wuwenbo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wry-0.55.1/build.rs:

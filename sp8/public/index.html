@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FHIR 订阅服务器</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { color: white; text-align: center; margin-bottom: 30px; font-size: 2.5em; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.disconnected { background: #f8d7da; color: #721c24; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #555; font-weight: 500; }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-danger { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .btn-success { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .btn-warning { background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); color: #333; }
+        .subscription-list, .notification-list, .resource-list, .history-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .item.created { border-left-color: #28a745; }
+        .item.updated { border-left-color: #ffc107; }
+        .item.deleted { border-left-color: #dc3545; }
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .item-title { font-weight: 600; color: #333; }
+        .item-time { font-size: 0.8em; color: #888; }
+        .item-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+        .badge-patient { background: #d1ecf1; color: #0c5460; }
+        .badge-observation { background: #e2e3e5; color: #383d41; }
+        .badge-created { background: #d4edda; color: #155724; }
+        .badge-updated { background: #fff3cd; color: #856404; }
+        .badge-deleted { background: #f8d7da; color: #721c24; }
+        .badge-info { background: #d1ecf1; color: #0c5460; }
+        .badge-heartbeat { background: #cce5ff; color: #004085; }
+        .item-content { font-size: 0.9em; color: #666; word-break: break-all; }
+        .action-btns { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        .action-btns button { padding: 6px 12px; font-size: 0.85em; }
+        .empty { text-align: center; color: #999; padding: 40px; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .notification-item { animation: slideIn 0.3s ease; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.85em;
+            overflow-x: auto;
+            max-height: 200px;
+        }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab {
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            background: #e9ecef;
+            transition: all 0.3s;
+        }
+        .tab.active { background: #667eea; color: white; }
+        .heartbeat-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85em;
+            color: #555;
+            margin-left: 12px;
+        }
+        .heartbeat-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #28a745;
+            animation: pulse 1.5s infinite;
+        }
+        .heartbeat-dot.dead { background: #dc3545; animation: none; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+        .export-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .card-full { grid-column: 1 / -1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 FHIR 订阅服务器</h1>
+        
+        <div class="grid">
+            <div class="card">
+                <h2>📡 WebSocket 连接</h2>
+                <div>
+                    <span id="ws-status" class="status disconnected">未连接</span>
+                    <span class="heartbeat-indicator" id="heartbeat-indicator" style="display:none;">
+                        <span class="heartbeat-dot" id="heartbeat-dot"></span>
+                        <span id="heartbeat-latency">-</span>
+                    </span>
+                </div>
+                <div class="form-group">
+                    <label>服务器地址</label>
+                    <input type="text" id="ws-url" value="ws://localhost:3000">
+                </div>
+                <button onclick="connectWebSocket()">连接</button>
+                <button class="btn-danger" onclick="disconnectWebSocket()">断开</button>
+                <div style="margin-top: 12px; font-size: 0.85em; color: #666;" id="connection-info"></div>
+            </div>
+
+            <div class="card">
+                <h2>📋 创建订阅</h2>
+                <div class="form-group">
+                    <label>订阅资源类型</label>
+                    <select id="sub-criteria">
+                        <option value="Patient">Patient (患者)</option>
+                        <option value="Observation">Observation (观察)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>订阅原因</label>
+                    <input type="text" id="sub-reason" placeholder="例如：实时监控患者数据变化">
+                </div>
+                <div class="row">
+                    <div class="form-group">
+                        <label>生效开始时间 (可选)</label>
+                        <input type="datetime-local" id="sub-start">
+                    </div>
+                    <div class="form-group">
+                        <label>生效结束时间 (可选)</label>
+                        <input type="datetime-local" id="sub-end">
+                    </div>
+                </div>
+                <button onclick="createSubscription()" id="btn-create-sub">创建订阅</button>
+            </div>
+
+            <div class="card">
+                <h2>📝 当前订阅列表</h2>
+                <div class="subscription-list" id="subscription-list">
+                    <div class="empty">暂无订阅</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>👤 患者资源管理</h2>
+                <div class="form-group">
+                    <label>姓氏</label>
+                    <input type="text" id="patient-family" placeholder="例如：张">
+                </div>
+                <div class="form-group">
+                    <label>名字</label>
+                    <input type="text" id="patient-given" placeholder="例如：三">
+                </div>
+                <div class="row">
+                    <div class="form-group">
+                        <label>性别</label>
+                        <select id="patient-gender">
+                            <option value="male">男</option>
+                            <option value="female">女</option>
+                            <option value="other">其他</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>出生日期</label>
+                        <input type="date" id="patient-birthdate">
+                    </div>
+                </div>
+                <button class="btn-success" onclick="createPatient()">创建患者</button>
+                <div style="margin-top: 20px;">
+                    <h3 style="font-size: 1em; margin-bottom: 10px;">现有患者</h3>
+                    <div class="resource-list" id="patient-list">
+                        <div class="empty">加载中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📊 观察资源管理</h2>
+                <div class="form-group">
+                    <label>关联患者ID</label>
+                    <input type="text" id="obs-patient" placeholder="例如：example-1">
+                </div>
+                <div class="form-group">
+                    <label>观察项目</label>
+                    <input type="text" id="obs-code" placeholder="例如：体重">
+                </div>
+                <div class="row">
+                    <div class="form-group">
+                        <label>数值</label>
+                        <input type="number" id="obs-value" placeholder="例如：70">
+                    </div>
+                    <div class="form-group">
+                        <label>单位</label>
+                        <input type="text" id="obs-unit" placeholder="例如：kg">
+                    </div>
+                </div>
+                <button class="btn-success" onclick="createObservation()">创建观察</button>
+                <div style="margin-top: 20px;">
+                    <h3 style="font-size: 1em; margin-bottom: 10px;">现有观察</h3>
+                    <div class="resource-list" id="observation-list">
+                        <div class="empty">加载中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🔔 实时通知</h2>
+                <div class="tabs">
+                    <div class="tab active" onclick="filterNotifications('all')">全部</div>
+                    <div class="tab" onclick="filterNotifications('Patient')">患者</div>
+                    <div class="tab" onclick="filterNotifications('Observation')">观察</div>
+                </div>
+                <div class="notification-list" id="notification-list">
+                    <div class="empty">等待通知...</div>
+                </div>
+                <button class="btn-danger" style="margin-top: 15px;" onclick="clearNotifications()">清空通知</button>
+            </div>
+
+            <div class="card card-full">
+                <h2>📜 订阅历史</h2>
+                <div class="export-bar">
+                    <select id="history-filter" onchange="loadHistory()">
+                        <option value="">全部事件</option>
+                        <option value="subscription_created">订阅创建</option>
+                        <option value="subscription_deleted">订阅删除</option>
+                        <option value="notification_sent">通知发送</option>
+                        <option value="notification_delivered">暂存通知推送</option>
+                        <option value="client_connected">客户端连接</option>
+                        <option value="client_disconnected">客户端断开</option>
+                        <option value="heartbeat_timeout">心跳超时</option>
+                    </select>
+                    <input type="datetime-local" id="history-from" onchange="loadHistory()" style="width: auto;">
+                    <input type="datetime-local" id="history-to" onchange="loadHistory()" style="width: auto;">
+                    <button onclick="loadHistory()">刷新</button>
+                    <button class="btn-success" onclick="exportHistory('json')">导出 JSON</button>
+                    <button class="btn-success" onclick="exportHistory('csv')">导出 CSV</button>
+                    <button class="btn-danger" onclick="clearHistory()">清空历史</button>
+                </div>
+                <div class="history-list" id="history-list">
+                    <div class="empty">暂无历史记录</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let notifications = [];
+        let currentFilter = 'all';
+        let heartbeatTimer = null;
+        let lastPingTime = null;
+
+        function connectWebSocket() {
+            const url = document.getElementById('ws-url').value;
+            ws = new WebSocket(url);
+            
+            ws.onopen = () => {
+                updateStatus(true);
+                startClientHeartbeat();
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+            
+            ws.onclose = () => {
+                updateStatus(false);
+                stopClientHeartbeat();
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket 错误:', error);
+            };
+        }
+
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function updateStatus(connected) {
+            const statusEl = document.getElementById('ws-status');
+            const hbIndicator = document.getElementById('heartbeat-indicator');
+            const infoEl = document.getElementById('connection-info');
+            
+            if (connected) {
+                statusEl.className = 'status connected';
+                statusEl.textContent = '已连接';
+                hbIndicator.style.display = 'inline-flex';
+            } else {
+                statusEl.className = 'status disconnected';
+                statusEl.textContent = '未连接';
+                hbIndicator.style.display = 'none';
+                infoEl.textContent = '';
+            }
+        }
+
+        function startClientHeartbeat() {
+            stopClientHeartbeat();
+            heartbeatTimer = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    lastPingTime = Date.now();
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                }
+            }, 10000);
+        }
+
+        function stopClientHeartbeat() {
+            if (heartbeatTimer) {
+                clearInterval(heartbeatTimer);
+                heartbeatTimer = null;
+            }
+        }
+
+        function handleWebSocketMessage(data) {
+            switch (data.type) {
+                case 'connected':
+                    document.getElementById('connection-info').textContent = 
+                        `客户端ID: ${data.clientId} | 心跳间隔: ${data.heartbeatInterval / 1000}s`;
+                    break;
+                case 'pong':
+                    const latency = Date.now() - lastPingTime;
+                    const dot = document.getElementById('heartbeat-dot');
+                    const latencyEl = document.getElementById('heartbeat-latency');
+                    dot.className = 'heartbeat-dot';
+                    latencyEl.textContent = `${latency}ms`;
+                    document.getElementById('connection-info').textContent = 
+                        document.getElementById('connection-info').textContent.split('|')[0] + 
+                        `| 延迟: ${latency}ms | 服务器运行: ${Math.floor(data.serverUptime)}s`;
+                    break;
+                case 'subscription_created':
+                    loadSubscriptions();
+                    break;
+                case 'notification':
+                case 'broadcast':
+                    addNotification(data);
+                    break;
+                case 'error':
+                    console.error('服务器错误:', data.message);
+                    break;
+            }
+        }
+
+        function createSubscription() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('请先连接WebSocket');
+                return;
+            }
+            
+            const criteria = document.getElementById('sub-criteria').value;
+            const reason = document.getElementById('sub-reason').value;
+            const start = document.getElementById('sub-start').value;
+            const end = document.getElementById('sub-end').value;
+            
+            const period = {};
+            if (start) period.start = new Date(start).toISOString();
+            if (end) period.end = new Date(end).toISOString();
+            
+            ws.send(JSON.stringify({
+                type: 'subscribe',
+                criteria,
+                reason,
+                period: Object.keys(period).length > 0 ? period : null
+            }));
+            
+            document.getElementById('sub-reason').value = '';
+            document.getElementById('sub-start').value = '';
+            document.getElementById('sub-end').value = '';
+        }
+
+        function unsubscribe(subscriptionId) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('请先连接WebSocket');
+                return;
+            }
+            ws.send(JSON.stringify({ type: 'unsubscribe', subscriptionId }));
+            setTimeout(loadSubscriptions, 100);
+        }
+
+        async function loadSubscriptions() {
+            try {
+                const response = await fetch('/api/subscriptions');
+                const subscriptions = await response.json();
+                renderSubscriptions(subscriptions);
+            } catch (e) {
+                console.error('加载订阅失败:', e);
+            }
+        }
+
+        function renderSubscriptions(subscriptions) {
+            const container = document.getElementById('subscription-list');
+            
+            if (subscriptions.length === 0) {
+                container.innerHTML = '<div class="empty">暂无订阅</div>';
+                return;
+            }
+            
+            container.innerHTML = subscriptions.map(sub => {
+                let periodText = '永久有效';
+                if (sub.period) {
+                    const start = sub.period.start ? new Date(sub.period.start).toLocaleString() : '立即生效';
+                    const end = sub.period.end ? new Date(sub.period.end).toLocaleString() : '无限期';
+                    periodText = `${start} ~ ${end}`;
+                }
+                
+                const statusBadge = sub.inPeriod 
+                    ? '<span class="item-badge badge-created">生效中</span>'
+                    : '<span class="item-badge badge-updated">未生效</span>';
+                
+                const wsBadge = sub.wsConnected
+                    ? '<span class="item-badge badge-heartbeat">WS已连接</span>'
+                    : '<span class="item-badge badge-deleted">WS断开</span>';
+
+                const hbInfo = sub.lastHeartbeat 
+                    ? ` | 最后心跳: ${new Date(sub.lastHeartbeat).toLocaleTimeString()}`
+                    : '';
+                
+                return `
+                <div class="item">
+                    <div class="item-header">
+                        <span class="item-title">${sub.criteria}</span>
+                        ${statusBadge} ${wsBadge}
+                    </div>
+                    <div class="item-content">
+                        <div>订阅ID: ${sub.id}</div>
+                        <div>原因: ${sub.reason || '-'}</div>
+                        <div>有效期: ${periodText}</div>
+                        <div>待发送通知: ${sub.pendingCount || 0} 条${hbInfo}</div>
+                        <div style="font-size: 0.8em; color: #888;">创建于: ${new Date(sub.createdAt).toLocaleString()}</div>
+                    </div>
+                    <div class="action-btns">
+                        <button class="btn-danger" onclick="unsubscribe('${sub.id}')">取消订阅</button>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        async function createPatient() {
+            const patient = {
+                name: [{
+                    family: document.getElementById('patient-family').value,
+                    given: [document.getElementById('patient-given').value]
+                }],
+                gender: document.getElementById('patient-gender').value,
+                birthDate: document.getElementById('patient-birthdate').value
+            };
+            try {
+                await fetch('/fhir/Patient', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(patient)
+                });
+                loadPatients();
+            } catch (e) { console.error('创建患者失败:', e); }
+        }
+
+        async function updatePatient(id) {
+            const family = prompt('输入新姓氏:');
+            if (!family) return;
+            try {
+                const response = await fetch(`/fhir/Patient/${id}`);
+                const patient = await response.json();
+                patient.name[0].family = family;
+                await fetch(`/fhir/Patient/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(patient)
+                });
+                loadPatients();
+            } catch (e) { console.error('更新患者失败:', e); }
+        }
+
+        async function deletePatient(id) {
+            if (!confirm('确认删除此患者?')) return;
+            try {
+                await fetch(`/fhir/Patient/${id}`, { method: 'DELETE' });
+                loadPatients();
+            } catch (e) { console.error('删除患者失败:', e); }
+        }
+
+        async function loadPatients() {
+            try {
+                const response = await fetch('/fhir/Patient');
+                const bundle = await response.json();
+                renderPatients(bundle.entry || []);
+            } catch (e) { console.error('加载患者失败:', e); }
+        }
+
+        function renderPatients(entries) {
+            const container = document.getElementById('patient-list');
+            if (entries.length === 0) {
+                container.innerHTML = '<div class="empty">暂无患者</div>';
+                return;
+            }
+            container.innerHTML = entries.map(e => {
+                const p = e.resource;
+                const name = p.name && p.name[0] ? `${p.name[0].family}${p.name[0].given?.[0] || ''}` : '未知';
+                return `
+                    <div class="item">
+                        <div class="item-header">
+                            <span class="item-badge badge-patient">Patient</span>
+                            <span class="item-time">版本: ${p.meta?.versionId || 1}</span>
+                        </div>
+                        <div class="item-title">${name}</div>
+                        <div class="item-content">ID: ${p.id}<br>性别: ${p.gender || '-'}<br>生日: ${p.birthDate || '-'}</div>
+                        <div class="action-btns">
+                            <button onclick="updatePatient('${p.id}')">编辑</button>
+                            <button class="btn-danger" onclick="deletePatient('${p.id}')">删除</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function createObservation() {
+            const observation = {
+                status: 'final',
+                code: { text: document.getElementById('obs-code').value },
+                subject: { reference: `Patient/${document.getElementById('obs-patient').value}` },
+                valueQuantity: {
+                    value: parseFloat(document.getElementById('obs-value').value),
+                    unit: document.getElementById('obs-unit').value
+                }
+            };
+            try {
+                await fetch('/fhir/Observation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(observation)
+                });
+                loadObservations();
+            } catch (e) { console.error('创建观察失败:', e); }
+        }
+
+        async function updateObservation(id) {
+            const value = prompt('输入新数值:');
+            if (!value) return;
+            try {
+                const response = await fetch(`/fhir/Observation/${id}`);
+                const obs = await response.json();
+                obs.valueQuantity.value = parseFloat(value);
+                await fetch(`/fhir/Observation/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(obs)
+                });
+                loadObservations();
+            } catch (e) { console.error('更新观察失败:', e); }
+        }
+
+        async function deleteObservation(id) {
+            if (!confirm('确认删除此观察?')) return;
+            try {
+                await fetch(`/fhir/Observation/${id}`, { method: 'DELETE' });
+                loadObservations();
+            } catch (e) { console.error('删除观察失败:', e); }
+        }
+
+        async function loadObservations() {
+            try {
+                const response = await fetch('/fhir/Observation');
+                const bundle = await response.json();
+                renderObservations(bundle.entry || []);
+            } catch (e) { console.error('加载观察失败:', e); }
+        }
+
+        function renderObservations(entries) {
+            const container = document.getElementById('observation-list');
+            if (entries.length === 0) {
+                container.innerHTML = '<div class="empty">暂无观察</div>';
+                return;
+            }
+            container.innerHTML = entries.map(e => {
+                const o = e.resource;
+                return `
+                    <div class="item">
+                        <div class="item-header">
+                            <span class="item-badge badge-observation">Observation</span>
+                            <span class="item-time">版本: ${o.meta?.versionId || 1}</span>
+                        </div>
+                        <div class="item-title">${o.code?.text || '未知'}</div>
+                        <div class="item-content">ID: ${o.id}<br>患者: ${o.subject?.reference || '-'}<br>数值: ${o.valueQuantity?.value || '-'} ${o.valueQuantity?.unit || ''}</div>
+                        <div class="action-btns">
+                            <button onclick="updateObservation('${o.id}')">编辑</button>
+                            <button class="btn-danger" onclick="deleteObservation('${o.id}')">删除</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addNotification(data) {
+            notifications.unshift({
+                id: Date.now(),
+                timestamp: data.timestamp,
+                resourceType: data.resourceType,
+                action: data.action,
+                resource: data.resource
+            });
+            renderNotifications();
+        }
+
+        function renderNotifications() {
+            const container = document.getElementById('notification-list');
+            let filtered = notifications;
+            if (currentFilter !== 'all') {
+                filtered = notifications.filter(n => n.resourceType === currentFilter);
+            }
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="empty">暂无通知</div>';
+                return;
+            }
+            container.innerHTML = filtered.map(n => `
+                <div class="item notification-item ${n.action}">
+                    <div class="item-header">
+                        <span class="item-badge badge-${n.resourceType.toLowerCase()}">${n.resourceType}</span>
+                        <span class="item-badge badge-${n.action}">${n.action === 'created' ? '创建' : n.action === 'updated' ? '更新' : '删除'}</span>
+                        <span class="item-time">${new Date(n.timestamp).toLocaleString()}</span>
+                    </div>
+                    <div class="item-title">资源ID: ${n.resource.id}</div>
+                    <div class="item-content"><pre>${JSON.stringify(n.resource, null, 2)}</pre></div>
+                </div>
+            `).join('');
+        }
+
+        function filterNotifications(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            renderNotifications();
+        }
+
+        function clearNotifications() {
+            notifications = [];
+            renderNotifications();
+        }
+
+        async function loadHistory() {
+            try {
+                const params = new URLSearchParams();
+                const eventType = document.getElementById('history-filter').value;
+                const from = document.getElementById('history-from').value;
+                const to = document.getElementById('history-to').value;
+                if (eventType) params.set('eventType', eventType);
+                if (from) params.set('from', new Date(from).toISOString());
+                if (to) params.set('to', new Date(to).toISOString());
+                
+                const response = await fetch(`/api/history?${params.toString()}`);
+                const history = await response.json();
+                renderHistory(history);
+            } catch (e) { console.error('加载历史失败:', e); }
+        }
+
+        const EVENT_LABELS = {
+            subscription_created: { label: '订阅创建', badge: 'badge-created' },
+            subscription_deleted: { label: '订阅删除', badge: 'badge-deleted' },
+            notification_sent: { label: '通知发送', badge: 'badge-info' },
+            notification_delivered: { label: '暂存推送', badge: 'badge-updated' },
+            client_connected: { label: '客户端连接', badge: 'badge-heartbeat' },
+            client_disconnected: { label: '客户端断开', badge: 'badge-deleted' },
+            heartbeat_timeout: { label: '心跳超时', badge: 'badge-deleted' }
+        };
+
+        function renderHistory(history) {
+            const container = document.getElementById('history-list');
+            if (history.length === 0) {
+                container.innerHTML = '<div class="empty">暂无历史记录</div>';
+                return;
+            }
+            container.innerHTML = history.map(h => {
+                const evt = EVENT_LABELS[h.eventType] || { label: h.eventType, badge: 'badge-info' };
+                return `
+                <div class="item">
+                    <div class="item-header">
+                        <span class="item-badge ${evt.badge}">${evt.label}</span>
+                        <span class="item-time">${new Date(h.timestamp).toLocaleString()}</span>
+                    </div>
+                    <div class="item-content">
+                        ${h.subscriptionId ? `订阅ID: ${h.subscriptionId}` : ''}
+                        ${h.criteria ? ` | 类型: ${h.criteria}` : ''}
+                        ${h.action ? ` | 操作: ${h.action}` : ''}
+                        ${h.resourceType ? ` | 资源: ${h.resourceType}` : ''}
+                        ${h.resourceId ? `#${h.resourceId}` : ''}
+                        ${h.clientId ? ` | 客户端: ${h.clientId.slice(0, 8)}...` : ''}
+                        ${h.reason ? ` | 原因: ${h.reason}` : ''}
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        function exportHistory(format) {
+            const params = new URLSearchParams();
+            params.set('format', format);
+            const eventType = document.getElementById('history-filter').value;
+            const from = document.getElementById('history-from').value;
+            const to = document.getElementById('history-to').value;
+            if (eventType) params.set('eventType', eventType);
+            if (from) params.set('from', new Date(from).toISOString());
+            if (to) params.set('to', new Date(to).toISOString());
+            window.open(`/api/history/export?${params.toString()}`, '_blank');
+        }
+
+        async function clearHistory() {
+            if (!confirm('确认清空所有订阅历史?')) return;
+            try {
+                await fetch('/api/history', { method: 'DELETE' });
+                loadHistory();
+            } catch (e) { console.error('清空历史失败:', e); }
+        }
+
+        window.onload = () => {
+            loadSubscriptions();
+            loadPatients();
+            loadObservations();
+            loadHistory();
+            setInterval(loadSubscriptions, 5000);
+            setInterval(loadHistory, 10000);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LISP Map-Server Dashboard</title>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #1e293b;
+            --bg-card-hover: #334155;
+            --border-color: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-amber: #f59e0b;
+            --accent-purple: #a855f7;
+            --accent-cyan: #06b6d4;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -2px rgba(0,0,0,0.2);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-card);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px 32px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s;
+        }
+
+        .stat-card:hover {
+            background: var(--bg-card-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .stat-card .label {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .stat-card .sub {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .stat-total .value { color: var(--accent-blue); }
+        .stat-online .value { color: var(--accent-green); }
+        .stat-grace .value { color: var(--accent-amber); }
+        .stat-offline .value { color: var(--accent-red); }
+        .stat-mappings .value { color: var(--accent-purple); }
+        .stat-proxy .value { color: var(--accent-cyan); }
+
+        .stats-grid-2 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-small {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .stat-small .label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-small .value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .stat-small .sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .stat-entry .value { color: var(--accent-amber); }
+        .stat-recover .value { color: var(--accent-green); }
+        .stat-expire .value { color: var(--accent-red); }
+        .stat-reply .value { color: var(--accent-cyan); }
+
+        .section {
+            margin-bottom: 24px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .section-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .section-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--accent-blue);
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+
+        .btn-danger {
+            background: transparent;
+            border-color: var(--accent-red);
+            color: var(--accent-red);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .table-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 14px 20px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(0,0,0,0.2);
+        }
+
+        td {
+            padding: 14px 20px;
+            font-size: 14px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .online-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .online-indicator.online {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--accent-green);
+        }
+
+        .online-indicator.offline {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+        }
+
+        .online-indicator.grace {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--accent-amber);
+        }
+
+        .online-indicator .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .online-indicator.online .dot {
+            background: var(--accent-green);
+            box-shadow: 0 0 6px var(--accent-green);
+        }
+
+        .online-indicator.offline .dot {
+            background: var(--accent-red);
+        }
+
+        .online-indicator.grace .dot {
+            background: var(--accent-amber);
+            animation: pulse-amber 1s infinite;
+        }
+
+        @keyframes pulse-amber {
+            0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--accent-amber); }
+            50% { opacity: 0.5; box-shadow: 0 0 12px var(--accent-amber); }
+        }
+
+        .offline-duration {
+            color: var(--accent-red);
+            font-weight: 500;
+        }
+
+        .grace-remain {
+            color: var(--accent-amber);
+            font-weight: 500;
+        }
+
+        .eid-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .eid-tag {
+            background: rgba(168, 85, 247, 0.15);
+            color: var(--accent-purple);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        .rloc-tag {
+            background: rgba(6, 182, 212, 0.15);
+            color: var(--accent-cyan);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.hidden { display: none; }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 520px;
+            max-width: 90vw;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .modal-close:hover { color: var(--text-primary); }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .form-group input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .rloc-inputs {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .time-info {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 13px;
+        }
+
+        .refresh-indicator {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .container {
+                padding: 16px;
+            }
+            .header {
+                padding: 16px;
+                flex-direction: column;
+                gap: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div class="logo">L</div>
+            <div>
+                <h1>LISP Map-Server</h1>
+                <p>EID-to-RLOC Mapping & ETR Liveness Monitor</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <span class="refresh-indicator">Auto-refresh: 3s</span>
+            <div class="status-badge">
+                <div class="status-dot"></div>
+                <span id="server-status">Server Running</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card stat-total">
+                <div class="label">Total ETRs</div>
+                <div class="value" id="stat-total">0</div>
+                <div class="sub">Registered tunnel routers</div>
+            </div>
+            <div class="stat-card stat-online">
+                <div class="label">Online</div>
+                <div class="value" id="stat-online">0</div>
+                <div class="sub">Heartbeat active</div>
+            </div>
+            <div class="stat-card stat-grace">
+                <div class="label">Grace Period</div>
+                <div class="value" id="stat-grace">0</div>
+                <div class="sub">120s recovery window</div>
+            </div>
+            <div class="stat-card stat-offline">
+                <div class="label">Offline</div>
+                <div class="value" id="stat-offline">0</div>
+                <div class="sub">Heartbeat timeout</div>
+            </div>
+            <div class="stat-card stat-mappings">
+                <div class="label">Mappings</div>
+                <div class="value" id="stat-mappings">0</div>
+                <div class="sub">EID-to-RLOC entries</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <h2>Heartbeat Statistics</h2>
+                <div class="section-actions">
+                    <button class="btn" onclick="exportStats('json')">Export JSON</button>
+                    <button class="btn btn-primary" onclick="exportStats('csv')">Export CSV</button>
+                </div>
+            </div>
+            <div class="stats-grid-2">
+                <div class="stat-small stat-entry">
+                    <div class="label">Grace Period Entries</div>
+                    <div class="value" id="hb-grace-entries">0</div>
+                    <div class="sub">Times ETRs entered grace period</div>
+                </div>
+                <div class="stat-small stat-recover">
+                    <div class="label">Recoveries</div>
+                    <div class="value" id="hb-recoveries">0</div>
+                    <div class="sub">ETRs recovered from grace period</div>
+                </div>
+                <div class="stat-small stat-expire">
+                    <div class="label">Grace Expirations</div>
+                    <div class="value" id="hb-expirations">0</div>
+                    <div class="sub">Grace periods expired → offline</div>
+                </div>
+                <div class="stat-small stat-reply">
+                    <div class="label">Proxy Replies</div>
+                    <div class="value" id="hb-proxy-replies">0</div>
+                    <div class="sub">Map-Request replied with mapping</div>
+                </div>
+            </div>
+            <div class="stats-grid-2">
+                <div class="stat-small">
+                    <div class="label">Heartbeats Received</div>
+                    <div class="value" id="hb-total">0</div>
+                    <div class="sub">Total heartbeat packets</div>
+                </div>
+                <div class="stat-small">
+                    <div class="label">Avg Recovery Time</div>
+                    <div class="value" id="hb-avg-recovery">0</div>
+                    <div class="sub">Average time to recover (ms)</div>
+                </div>
+                <div class="stat-small">
+                    <div class="label">Min Recovery Time</div>
+                    <div class="value" id="hb-min-recovery">0</div>
+                    <div class="sub">Fastest recovery (ms)</div>
+                </div>
+                <div class="stat-small">
+                    <div class="label">Max Recovery Time</div>
+                    <div class="value" id="hb-max-recovery">0</div>
+                    <div class="sub">Slowest recovery (ms)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <h2>ETR Status</h2>
+                <div class="section-actions">
+                    <button class="btn" onclick="simulateOffline()">Simulate Offline</button>
+                    <button class="btn btn-primary" onclick="openRegisterModal()">+ Register ETR</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ETR Address</th>
+                            <th>Status</th>
+                            <th>Last Heartbeat</th>
+                            <th>Duration</th>
+                            <th>Registered EIDs</th>
+                            <th>Register Count</th>
+                        </tr>
+                    </thead>
+                    <tbody id="etr-table">
+                        <tr>
+                            <td colspan="6">
+                                <div class="empty-state">
+                                    <div class="icon">📡</div>
+                                    <p>No ETRs registered</p>
+                                    <p>Waiting for Map-Register messages...</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <h2>EID-to-RLOC Mappings</h2>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>EID Prefix</th>
+                            <th>Prefix Length</th>
+                            <th>RLOCs</th>
+                            <th>ETR</th>
+                            <th>TTL</th>
+                            <th>Last Updated</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mapping-table">
+                        <tr>
+                            <td colspan="6">
+                                <div class="empty-state">
+                                    <div class="icon">🗺️</div>
+                                    <p>No mappings yet</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="register-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Register ETR Mapping</h3>
+                <button class="modal-close" onclick="closeRegisterModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>EID Address</label>
+                    <input type="text" id="reg-eid" placeholder="e.g. 10.0.1.0">
+                </div>
+                <div class="form-group">
+                    <label>Prefix Length</label>
+                    <input type="number" id="reg-prefix" placeholder="24" value="24">
+                </div>
+                <div class="form-group">
+                    <label>ETR Address (RLOC)</label>
+                    <input type="text" id="reg-etr" placeholder="e.g. 192.168.1.1">
+                </div>
+                <div class="form-group">
+                    <label>TTL (seconds)</label>
+                    <input type="number" id="reg-ttl" placeholder="60" value="60">
+                </div>
+                <div class="form-group">
+                    <label>RLOCs</label>
+                    <div id="rloc-list">
+                        <div class="rloc-inputs">
+                            <input type="text" class="rloc-addr" placeholder="RLOC address">
+                            <input type="number" class="rloc-pri" placeholder="Priority" value="1">
+                            <input type="number" class="rloc-weight" placeholder="Weight" value="100">
+                        </div>
+                    </div>
+                    <button class="btn" onclick="addRlocInput()" style="margin-top:4px;font-size:12px;">+ Add RLOC</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeRegisterModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="submitRegister()">Register</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let refreshTimer = null;
+
+        async function fetchJSON(url, options) {
+            try {
+                const resp = await fetch(url, options);
+                return await resp.json();
+            } catch (e) {
+                console.error('Fetch error:', e);
+                return null;
+            }
+        }
+
+        async function loadStats() {
+            const data = await fetchJSON(API_BASE + '/stats');
+            if (!data || !data.success) return;
+            const s = data.data;
+            document.getElementById('stat-total').textContent = s.total_etrs;
+            document.getElementById('stat-online').textContent = s.online_etrs;
+            document.getElementById('stat-grace').textContent = s.grace_period_etrs;
+            document.getElementById('stat-offline').textContent = s.offline_etrs;
+            document.getElementById('stat-mappings').textContent = s.total_mappings;
+        }
+
+        async function loadHeartbeatStats() {
+            const data = await fetchJSON(API_BASE + '/stats/heartbeat');
+            if (!data || !data.success) return;
+            const s = data.data;
+            document.getElementById('hb-grace-entries').textContent = s.total_grace_period_entries;
+            document.getElementById('hb-recoveries').textContent = s.total_recoveries;
+            document.getElementById('hb-expirations').textContent = s.total_grace_expirations;
+            document.getElementById('hb-proxy-replies').textContent = s.total_proxy_replies;
+            document.getElementById('hb-total').textContent = s.total_heartbeats_received;
+            document.getElementById('hb-avg-recovery').textContent = s.avg_recovery_time_ms + 'ms';
+            document.getElementById('hb-min-recovery').textContent = s.min_recovery_time_ms + 'ms';
+            document.getElementById('hb-max-recovery').textContent = s.max_recovery_time_ms + 'ms';
+        }
+
+        function exportStats(format) {
+            window.open(API_BASE + '/stats/export?format=' + format, '_blank');
+        }
+
+        function getETRStatus(etr) {
+            if (etr.in_grace_period) {
+                return { cls: 'grace', text: 'Grace Period' };
+            } else if (etr.online) {
+                return { cls: 'online', text: 'Online' };
+            } else {
+                return { cls: 'offline', text: 'Offline' };
+            }
+        }
+
+        function getETRDuration(etr) {
+            if (etr.in_grace_period) {
+                return `<span class="grace-remain">${etr.grace_period_remain || 'N/A'}</span>`;
+            } else if (!etr.online) {
+                return `<span class="offline-duration">${etr.offline_duration || 'N/A'}</span>`;
+            }
+            return '<span style="color:var(--text-muted)">—</span>';
+        }
+
+        async function loadETRs() {
+            const data = await fetchJSON(API_BASE + '/etrs');
+            if (!data || !data.success) return;
+            const etrs = data.data;
+            const tbody = document.getElementById('etr-table');
+
+            if (etrs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="icon">📡</div><p>No ETRs registered</p><p>Waiting for Map-Register messages...</p></div></td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = etrs.map(etr => {
+                const status = getETRStatus(etr);
+                return `
+                <tr>
+                    <td><span class="rloc-tag">${etr.etr_addr}</span></td>
+                    <td>
+                        <span class="online-indicator ${status.cls}">
+                            <span class="dot"></span>
+                            ${status.text}
+                        </span>
+                    </td>
+                    <td class="time-info">${formatTime(etr.last_heartbeat)}</td>
+                    <td>${getETRDuration(etr)}</td>
+                    <td>
+                        <div class="eid-list">
+                            ${(etr.registered_eids || []).map(e => `<span class="eid-tag">${e}</span>`).join('')}
+                        </div>
+                    </td>
+                    <td>${etr.map_register_count}</td>
+                </tr>
+            `}).join('');
+        }
+
+        async function loadMappings() {
+            const data = await fetchJSON(API_BASE + '/mappings');
+            if (!data || !data.success) return;
+            const mappings = data.data;
+            const tbody = document.getElementById('mapping-table');
+
+            if (mappings.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="icon">🗺️</div><p>No mappings yet</p></div></td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = mappings.map(m => `
+                <tr>
+                    <td><span class="eid-tag">${m.eid}</span></td>
+                    <td>/${m.prefix_len}</td>
+                    <td>
+                        <div class="eid-list">
+                            ${m.rlocs.map(r => `<span class="rloc-tag">${r.address}</span>`).join('')}
+                        </div>
+                    </td>
+                    <td><span class="rloc-tag">${m.etr_addr}</span></td>
+                    <td>${m.ttl}s</td>
+                    <td class="time-info">${formatTime(m.updated)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function formatTime(ts) {
+            if (!ts || ts === '0001-01-01T00:00:00Z') return '—';
+            const d = new Date(ts);
+            if (isNaN(d.getTime())) return '—';
+            return d.toLocaleTimeString('zh-CN', { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+        }
+
+        async function refreshAll() {
+            await Promise.all([loadStats(), loadHeartbeatStats(), loadETRs(), loadMappings()]);
+        }
+
+        function openRegisterModal() {
+            document.getElementById('register-modal').classList.remove('hidden');
+        }
+
+        function closeRegisterModal() {
+            document.getElementById('register-modal').classList.add('hidden');
+        }
+
+        function addRlocInput() {
+            const list = document.getElementById('rloc-list');
+            const div = document.createElement('div');
+            div.className = 'rloc-inputs';
+            div.style.marginTop = '8px';
+            div.innerHTML = `
+                <input type="text" class="rloc-addr" placeholder="RLOC address">
+                <input type="number" class="rloc-pri" placeholder="Priority" value="1">
+                <input type="number" class="rloc-weight" placeholder="Weight" value="100">
+            `;
+            list.appendChild(div);
+        }
+
+        async function submitRegister() {
+            const eid = document.getElementById('reg-eid').value.trim();
+            const prefixLen = parseInt(document.getElementById('reg-prefix').value) || 24;
+            const etrAddr = document.getElementById('reg-etr').value.trim();
+            const ttl = parseInt(document.getElementById('reg-ttl').value) || 60;
+
+            const rlocAddrs = document.querySelectorAll('.rloc-addr');
+            const rlocPris = document.querySelectorAll('.rloc-pri');
+            const rlocWeights = document.querySelectorAll('.rloc-weight');
+
+            const rlocs = [];
+            rlocAddrs.forEach((el, i) => {
+                const addr = el.value.trim();
+                if (addr) {
+                    rlocs.push({
+                        address: addr,
+                        priority: parseInt(rlocPris[i].value) || 1,
+                        weight: parseInt(rlocWeights[i].value) || 100
+                    });
+                }
+            });
+
+            const resp = await fetchJSON(API_BASE + '/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eid: eid,
+                    prefix_len: prefixLen,
+                    etr_addr: etrAddr,
+                    ttl: ttl,
+                    rlocs: rlocs
+                })
+            });
+
+            if (resp && resp.success) {
+                closeRegisterModal();
+                refreshAll();
+            } else {
+                alert('Registration failed: ' + (resp ? resp.error : 'network error'));
+            }
+        }
+
+        async function simulateOffline() {
+            const data = await fetchJSON(API_BASE + '/etrs');
+            if (!data || !data.success || data.data.length === 0) {
+                alert('No ETRs to set offline');
+                return;
+            }
+            const etrAddr = prompt('Enter ETR address to set offline:\n\nAvailable: ' + data.data.map(e => e.etr_addr).join(', '));
+            if (!etrAddr) return;
+
+            await fetchJSON(API_BASE + '/heartbeat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ etr_addr: etrAddr })
+            });
+
+            const store = window.__store;
+            if (store) {
+                store.setETROffline(etrAddr);
+            }
+            refreshAll();
+        }
+
+        refreshAll();
+        refreshTimer = setInterval(refreshAll, 3000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "identifier": "default",
+  "description": "Capability for the main window",
+  "windows": ["main", "floating"],
+  "permissions": [
+    "core:default",
+    "core:window:default",
+    "core:window:allow-create",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-decorations",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position",
+    "core:window:allow-close",
+    "core:window:allow-set-background-color",
+    "dialog:default",
+    "dialog:allow-open",
+    "fs:default",
+    "fs:allow-read-file",
+    "fs:allow-read-dir",
+    "fs:allow-exists",
+    "fs:allow-stat",
+    "fs:allow-write-file",
+    "fs:allow-write-text-file"
+  ]
+}

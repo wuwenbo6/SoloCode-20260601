@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: ssh-terminal-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ssh-terminal-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: 8080
+      DB_DRIVER: sqlite
+      DB_DSN: /app/data/ssh-terminal.db
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: recordings
+      MINIO_USE_SSL: "false"
+      JWT_SECRET: ssh-web-terminal-secret-key-change-in-production
+      JWT_EXPIRY: 24
+      SSH_TIMEOUT: 30
+    volumes:
+      - backend_data:/app/data
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ssh-terminal-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  minio_data:
+  backend_data:

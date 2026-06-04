@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSI Mock Driver - 控制面板（增强版）</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .card-header h2 {
+            color: #333;
+            font-size: 1.4em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+        }
+
+        .icon.volume {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .icon.snapshot {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: white;
+        }
+
+        .icon.editor {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            color: white;
+        }
+
+        .icon.checksum {
+            background: linear-gradient(135deg, #fa709a, #fee140);
+            color: white;
+        }
+
+        .icon.chain {
+            background: linear-gradient(135deg, #a8edea, #fed6e3);
+            color: #333;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: #f0f0f0;
+            color: #666;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95em;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: #e0e0e0;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            resize: vertical;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            line-height: 1.6;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: white;
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #43e97b, #38f9d7);
+            color: white;
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        .btn-refresh {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            color: white;
+            padding: 8px 16px;
+            font-size: 0.9em;
+        }
+
+        .btn-checksum {
+            background: linear-gradient(135deg, #fa709a, #fee140);
+            color: white;
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px;
+            background: #f8f9fa;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        th:first-child {
+            border-radius: 8px 0 0 0;
+        }
+
+        th:last-child {
+            border-radius: 0 8px 0 0;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.85em;
+            color: #555;
+            vertical-align: middle;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+
+        .badge.available {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge.ready {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .badge.full {
+            background: #c3e6cb;
+            color: #155724;
+        }
+
+        .badge.incremental {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge.valid {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge.invalid {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .checksum-text {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.75em;
+            color: #666;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+
+        .checksum-text:hover {
+            color: #667eea;
+        }
+
+        .code-block {
+            background: #2d2d2d;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 11px;
+            overflow-x: auto;
+            margin-bottom: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .example-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .example-card h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+
+        .example-card p {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #43e97b;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-card .number {
+            font-size: 2em;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-card .label {
+            color: #666;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .empty-state .emoji {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #43e97b, #38f9d7);
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+        }
+
+        .toast.info {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+        }
+
+        .source-info {
+            font-size: 0.8em;
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .chain-visualization {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .chain-node {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px 15px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            min-width: 120px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .chain-node.selected {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .chain-node.full {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+        }
+
+        .chain-node.incremental {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+        }
+
+        .chain-node-name {
+            font-weight: 600;
+            font-size: 0.85em;
+            color: #333;
+        }
+
+        .chain-node-type {
+            font-size: 0.7em;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .chain-arrow {
+            font-size: 1.5em;
+            color: #999;
+        }
+
+        .checksum-result {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .checksum-result.valid {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+
+        .checksum-result.invalid {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+
+        .checksum-result p {
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+
+        .checksum-result code {
+            background: rgba(0,0,0,0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85em;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9em;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.95em;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        @media (max-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .btn-group {
+                flex-direction: column;
+            }
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .action-cell {
+            white-space: nowrap;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            width: 100px;
+        }
+
+        .progress-bar-fill, .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+
+        .stat-value.success {
+            color: #7cfc00;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .modal-header h3 {
+            color: #333;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 CSI Mock Driver</h1>
+            <p>增强版 - 支持Checksum校验、增量快照、快照链合并</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="number" id="volCount">0</div>
+                <div class="label">总卷数</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="snapCount">0</div>
+                <div class="label">快照总数</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="fullSnapCount">0</div>
+                <div class="label">全量快照</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="incSnapCount">0</div>
+                <div class="label">增量快照</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="restoredCount">0</div>
+                <div class="label">恢复卷</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="clonedCount">0</div>
+                <div class="label">克隆卷</div>
+            </div>
+            <div class="stat-card">
+                <div class="status-dot"></div>
+                <span style="color: #43e97b; font-weight: 600;">运行中</span>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <div class="card full-width">
+                <div class="card-header">
+                    <h2><span class="icon editor">📝</span> 快速操作面板</h2>
+                </div>
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="create-vol">创建卷</button>
+                    <button class="tab-btn" data-tab="write-data">写入数据</button>
+                    <button class="tab-btn" data-tab="clone">卷克隆</button>
+                    <button class="tab-btn" data-tab="full-snap">全量快照</button>
+                    <button class="tab-btn" data-tab="inc-snap">增量快照</button>
+                    <button class="tab-btn" data-tab="restore">快照恢复</button>
+                    <button class="tab-btn" data-tab="space-stats">空间统计</button>
+                    <button class="tab-btn" data-tab="checksum">Checksum校验</button>
+                </div>
+
+                <div class="tab-content active" id="tab-create-vol">
+                    <div class="form-group">
+                        <label>卷名称</label>
+                        <input type="text" id="newVolName" placeholder="例如: my-volume" value="test-vol">
+                    </div>
+                    <div class="form-group">
+                        <label>容量 (GiB)</label>
+                        <input type="number" id="newVolSize" value="1" min="1">
+                    </div>
+                    <button class="btn btn-primary" onclick="createVolume()">创建卷</button>
+                </div>
+
+                <div class="tab-content" id="tab-write-data">
+                    <div class="form-group">
+                        <label>选择卷</label>
+                        <select id="writeVolSelect"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>块索引</label>
+                        <input type="number" id="blockIndex" value="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>数据 (十六进制)</label>
+                        <input type="text" id="blockData" placeholder="例如: 48656c6c6f" value="48656c6c6f20576f726c64">
+                    </div>
+                    <button class="btn btn-primary" onclick="writeBlock()">写入数据</button>
+                </div>
+
+                <div class="tab-content" id="tab-clone">
+                    <div class="form-group">
+                        <label>源卷</label>
+                        <select id="cloneSourceVolSelect"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>新卷名称</label>
+                        <input type="text" id="cloneTargetName" placeholder="例如: cloned-vol" value="cloned-vol">
+                    </div>
+                    <button class="btn btn-primary" onclick="cloneVolume()">克隆卷</button>
+                </div>
+
+                <div class="tab-content" id="tab-full-snap">
+                    <div class="form-group">
+                        <label>快照名称</label>
+                        <input type="text" id="fullSnapName" placeholder="例如: snap-full-1" value="snap-full-1">
+                    </div>
+                    <div class="form-group">
+                        <label>源卷</label>
+                        <select id="fullSnapVolSelect"></select>
+                    </div>
+                    <button class="btn btn-primary" onclick="createFullSnapshot()">创建全量快照</button>
+                </div>
+
+                <div class="tab-content" id="tab-inc-snap">
+                    <div class="form-group">
+                        <label>快照名称</label>
+                        <input type="text" id="incSnapName" placeholder="例如: snap-inc-1" value="snap-inc-1">
+                    </div>
+                    <div class="form-group">
+                        <label>源卷</label>
+                        <select id="incSnapVolSelect" onchange="updateParentSnapshotSelect()"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>父快照 (增量基准)</label>
+                        <select id="incSnapParentSelect"></select>
+                    </div>
+                    <button class="btn btn-primary" onclick="createIncrementalSnapshot()">创建增量快照</button>
+                </div>
+
+                <div class="tab-content" id="tab-restore">
+                    <div class="form-group">
+                        <label>新卷名称</label>
+                        <input type="text" id="restoreVolName" placeholder="例如: restored-vol" value="restored-vol">
+                    </div>
+                    <div class="form-group">
+                        <label>从快照恢复</label>
+                        <select id="restoreSnapSelect"></select>
+                    </div>
+                    <button class="btn btn-primary" onclick="restoreVolume()">从快照链恢复</button>
+                </div>
+
+                <div class="tab-content" id="tab-space-stats">
+                    <div class="form-group">
+                        <label>选择快照 (可选，留空则统计全部)</label>
+                        <select id="spaceStatsSnapSelect">
+                            <option value="">-- 全部快照 --</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="getSpaceStats()">获取空间统计</button>
+                    <div id="spaceStatsResult"></div>
+                </div>
+
+                <div class="tab-content" id="tab-checksum">
+                    <div class="form-group">
+                        <label>选择快照</label>
+                        <select id="checksumSnapSelect"></select>
+                    </div>
+                    <button class="btn btn-checksum" onclick="verifyChecksum()">校验Checksum</button>
+                    <div id="checksumResult"></div>
+                </div>
+            </div>
+
+            <div class="card full-width">
+                <div class="card-header">
+                    <h2><span class="icon chain">🔗</span> 快照链可视化</h2>
+                    <button class="btn btn-refresh" onclick="refreshData()">🔄 刷新</button>
+                </div>
+                <div id="snapshotChainContainer" class="chain-visualization">
+                    <div class="empty-state">
+                        <div class="emoji">🔗</div>
+                        <p>创建快照后将显示快照链</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2><span class="icon volume">💾</span> 卷列表</h2>
+                    <button class="btn btn-refresh" onclick="refreshData()">🔄 刷新</button>
+                </div>
+                <div id="volumes-container" class="table-container"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2><span class="icon snapshot">📸</span> 快照列表</h2>
+                    <button class="btn btn-refresh" onclick="refreshData()">🔄 刷新</button>
+                </div>
+                <div id="snapshots-container" class="table-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let volumes = [];
+        let snapshots = [];
+
+        function init() {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+                });
+            });
+
+            refreshData();
+            setInterval(refreshData, 10000);
+        }
+
+        async function fetchData() {
+            try {
+                const [volRes, snapRes] = await Promise.all([
+                    fetch('/api/volumes'),
+                    fetch('/api/snapshots')
+                ]);
+                volumes = await volRes.json();
+                snapshots = await snapRes.json();
+                renderVolumes();
+                renderSnapshots();
+                renderSnapshotChain();
+                updateSelects();
+                updateStats();
+            } catch (e) {
+                console.error('Failed to fetch data:', e);
+            }
+        }
+
+        function refreshData() {
+            fetchData();
+        }
+
+        function updateStats() {
+            document.getElementById('volCount').textContent = volumes.length;
+            document.getElementById('snapCount').textContent = snapshots.length;
+            document.getElementById('fullSnapCount').textContent = snapshots.filter(s => !s.isIncremental).length;
+            document.getElementById('incSnapCount').textContent = snapshots.filter(s => s.isIncremental).length;
+            const restored = volumes.filter(v => v.contentSource && v.contentSource.SnapshotID).length;
+            document.getElementById('restoredCount').textContent = restored;
+            const cloned = volumes.filter(v => v.contentSource && v.contentSource.VolumeCloneID).length;
+            document.getElementById('clonedCount').textContent = cloned;
+        }
+
+        function updateSelects() {
+            const volOpts = volumes.map(v => `<option value="${v.id}">${v.name} (${v.id})</option>`).join('');
+            const snapOpts = snapshots.map(s => `<option value="${s.id}">${s.name} (${s.isIncremental ? '增量' : '全量'})</option>`).join('');
+
+            document.getElementById('writeVolSelect').innerHTML = volOpts;
+            document.getElementById('cloneSourceVolSelect').innerHTML = volOpts;
+            document.getElementById('fullSnapVolSelect').innerHTML = volOpts;
+            document.getElementById('incSnapVolSelect').innerHTML = volOpts;
+            document.getElementById('restoreSnapSelect').innerHTML = snapOpts;
+            document.getElementById('checksumSnapSelect').innerHTML = snapOpts;
+            document.getElementById('spaceStatsSnapSelect').innerHTML = '<option value="">-- 全部快照 --</option>' + snapOpts;
+
+            updateParentSnapshotSelect();
+        }
+
+        function updateParentSnapshotSelect() {
+            const volId = document.getElementById('incSnapVolSelect').value;
+            const volSnaps = snapshots.filter(s => s.sourceVolumeId === volId);
+            const opts = volSnaps.map(s => `<option value="${s.id}">${s.name} (${s.isIncremental ? '增量' : '全量'})</option>`).join('');
+            document.getElementById('incSnapParentSelect').innerHTML = opts;
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatTime(timeStr) {
+            if (!timeStr) return '-';
+            const date = new Date(timeStr);
+            return date.toLocaleString('zh-CN');
+        }
+
+        function renderVolumes() {
+            const container = document.getElementById('volumes-container');
+            if (volumes.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="emoji">📦</div>
+                        <p>暂无卷数据</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<table><thead><tr><th>名称</th><th>容量</th><th>块数</th><th>来源</th><th>状态</th><th>创建时间</th></tr></thead><tbody>';
+            volumes.forEach(vol => {
+                let source = '-';
+                if (vol.contentSource) {
+                    if (vol.contentSource.SnapshotID) {
+                        source = `<span class="source-info">📸 ${vol.contentSource.SnapshotID}</span>`;
+                    } else if (vol.contentSource.VolumeCloneID) {
+                        source = `<span class="source-info">📋 ${vol.contentSource.VolumeCloneID}</span>`;
+                    }
+                }
+                html += `
+                    <tr>
+                        <td style="font-family: monospace;">
+                            <div style="color: #333; font-weight: 500;">${vol.name || '-'}</div>
+                            <div style="color: #999; font-size: 0.8em;">${vol.id}</div>
+                        </td>
+                        <td>${formatBytes(vol.sizeBytes)}</td>
+                        <td>${vol.blockCount}</td>
+                        <td>${source}</td>
+                        <td><span class="badge available">${vol.status}</span></td>
+                        <td>${formatTime(vol.createdAt)}</td>
+                    </tr>
+                `;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function renderSnapshots() {
+            const container = document.getElementById('snapshots-container');
+            if (snapshots.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="emoji">📷</div>
+                        <p>暂无快照数据</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<table><thead><tr><th>名称</th><th>类型</th><th>源卷</th><th>变更块</th><th>Checksum</th><th>操作</th></tr></thead><tbody>';
+            snapshots.forEach(snap => {
+                const typeBadge = snap.isIncremental
+                    ? '<span class="badge incremental">增量</span>'
+                    : '<span class="badge full">全量</span>';
+                const changePercent = snap.blockCount > 0
+                    ? ((snap.changedBlocks / snap.blockCount) * 100).toFixed(1) + '%'
+                    : '0%';
+                html += `
+                    <tr>
+                        <td style="font-family: monospace;">
+                            <div style="color: #333; font-weight: 500;">${snap.name || '-'}</div>
+                            <div style="color: #999; font-size: 0.8em;">${snap.id}</div>
+                        </td>
+                        <td>${typeBadge}</td>
+                        <td style="font-family: monospace; font-size: 0.8em;">${snap.sourceVolumeId}</td>
+                        <td>
+                            <div>${snap.changedBlocks} / ${snap.blockCount}</div>
+                            <div class="progress-bar"><div class="progress-bar-fill" style="width: ${changePercent}"></div></div>
+                            <div style="font-size: 0.75em; color: #999;">${changePercent}</div>
+                        </td>
+                        <td>
+                            <span class="checksum-text" title="${snap.checksum}" onclick="copyToClipboard('${snap.checksum}')">
+                                ${snap.checksum.substring(0, 16)}...
+                            </span>
+                        </td>
+                        <td class="action-cell">
+                            <button class="btn btn-checksum" onclick="verifySnapshotChecksum('${snap.id}')">校验</button>
+                            <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85em;" onclick="showSnapshotChain('${snap.id}')">链</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function renderSnapshotChain() {
+            const container = document.getElementById('snapshotChainContainer');
+
+            const rootSnaps = snapshots.filter(s => !s.parentId);
+            if (rootSnaps.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="emoji">🔗</div>
+                        <p>创建快照后将显示快照链</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            rootSnaps.forEach(root => {
+                html += renderChainNode(root);
+            });
+
+            container.innerHTML = html || '<p>无快照链</p>';
+        }
+
+        function renderChainNode(snap) {
+            const children = snapshots.filter(s => s.parentId === snap.id);
+            let html = '';
+
+            html += `<div class="chain-node ${snap.isIncremental ? 'incremental' : 'full'}">
+                <div class="chain-node-name">${snap.name}</div>
+                <div class="chain-node-type">${snap.isIncremental ? '增量' : '全量'} | ${snap.changedBlocks}块变更</div>
+            </div>`;
+
+            children.forEach((child, index) => {
+                html += '<div class="chain-arrow">→</div>';
+                html += renderChainNode(child);
+            });
+
+            return html;
+        }
+
+        async function createVolume() {
+            const name = document.getElementById('newVolName').value;
+            const size = parseInt(document.getElementById('newVolSize').value) * 1024 * 1024 * 1024;
+
+            if (!name) {
+                showToast('请输入卷名称', 'error');
+                return;
+            }
+
+            try {
+                const volId = 'vol-' + name + '-' + Date.now().toString(36);
+                const contentSource = null;
+
+                volumes.push({
+                    id: volId,
+                    name: name,
+                    sizeBytes: size,
+                    blockCount: Math.ceil(size / 4096),
+                    contentSource: contentSource,
+                    status: 'available',
+                    createdAt: new Date().toISOString()
+                });
+
+                renderVolumes();
+                updateSelects();
+                updateStats();
+                showToast(`成功创建卷: ${name}`, 'success');
+            } catch (e) {
+                showToast('创建卷失败', 'error');
+            }
+        }
+
+        async function writeBlock() {
+            const volumeId = document.getElementById('writeVolSelect').value;
+            const blockIndex = parseInt(document.getElementById('blockIndex').value);
+            const data = document.getElementById('blockData').value;
+
+            if (!volumeId) {
+                showToast('请选择卷', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/volume/write-block', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ volumeId, blockIndex, data })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    showToast(`成功写入块 ${blockIndex}`, 'success');
+                } else {
+                    showToast('写入失败', 'error');
+                }
+            } catch (e) {
+                showToast('写入失败: ' + e.message, 'error');
+            }
+        }
+
+        async function createFullSnapshot() {
+            const name = document.getElementById('fullSnapName').value;
+            const sourceVolumeId = document.getElementById('fullSnapVolSelect').value;
+
+            if (!name || !sourceVolumeId) {
+                showToast('请填写完整信息', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/snapshot/create-full', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, sourceVolumeId })
+                });
+                const snap = await res.json();
+                snapshots.push(snap);
+                renderSnapshots();
+                renderSnapshotChain();
+                updateSelects();
+                updateStats();
+                showToast(`成功创建全量快照: ${name}`, 'success');
+            } catch (e) {
+                showToast('创建快照失败: ' + e.message, 'error');
+            }
+        }
+
+        async function createIncrementalSnapshot() {
+            const name = document.getElementById('incSnapName').value;
+            const sourceVolumeId = document.getElementById('incSnapVolSelect').value;
+            const parentSnapshotId = document.getElementById('incSnapParentSelect').value;
+
+            if (!name || !sourceVolumeId || !parentSnapshotId) {
+                showToast('请填写完整信息', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/snapshot/create-incremental', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, sourceVolumeId, parentSnapshotId })
+                });
+                const snap = await res.json();
+                snapshots.push(snap);
+                renderSnapshots();
+                renderSnapshotChain();
+                updateSelects();
+                updateStats();
+                showToast(`成功创建增量快照: ${name}`, 'success');
+            } catch (e) {
+                showToast('创建增量快照失败: ' + e.message, 'error');
+            }
+        }
+
+        async function restoreVolume() {
+            const name = document.getElementById('restoreVolName').value;
+            const snapshotId = document.getElementById('restoreSnapSelect').value;
+
+            if (!name || !snapshotId) {
+                showToast('请填写完整信息', 'error');
+                return;
+            }
+
+            try {
+                const snap = snapshots.find(s => s.id === snapshotId);
+                const volId = 'vol-' + name + '-' + Date.now().toString(36);
+
+                volumes.push({
+                    id: volId,
+                    name: name,
+                    sizeBytes: snap.sizeBytes,
+                    blockCount: snap.blockCount,
+                    contentSource: { SnapshotID: snapshotId },
+                    status: 'available',
+                    createdAt: new Date().toISOString()
+                });
+
+                renderVolumes();
+                updateSelects();
+                updateStats();
+                showToast(`成功从快照链恢复卷: ${name}`, 'success');
+            } catch (e) {
+                showToast('恢复卷失败', 'error');
+            }
+        }
+
+        async function verifyChecksum() {
+            const snapshotId = document.getElementById('checksumSnapSelect').value;
+            verifySnapshotChecksum(snapshotId);
+        }
+
+        async function verifySnapshotChecksum(snapshotId) {
+            try {
+                const res = await fetch('/api/snapshot/verify-checksum', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ snapshotId })
+                });
+                const result = await res.json();
+
+                const resultDiv = document.getElementById('checksumResult') || document.createElement('div');
+                resultDiv.id = 'checksumResult';
+
+                if (result.valid) {
+                    resultDiv.innerHTML = `
+                        <div class="checksum-result valid">
+                            <p><strong>✅ Checksum 校验通过！</strong></p>
+                            <p>存储的Checksum: <code>${result.storedChecksum}</code></p>
+                            <p>计算的Checksum: <code>${result.currentChecksum}</code></p>
+                        </div>
+                    `;
+                    showToast('Checksum 校验通过', 'success');
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="checksum-result invalid">
+                            <p><strong>❌ Checksum 校验失败！</strong></p>
+                            <p>存储的Checksum: <code>${result.storedChecksum}</code></p>
+                            <p>计算的Checksum: <code>${result.currentChecksum}</code></p>
+                        </div>
+                    `;
+                    showToast('Checksum 校验失败', 'error');
+                }
+
+                const tabChecksum = document.getElementById('tab-checksum');
+                if (!tabChecksum.contains(resultDiv)) {
+                    tabChecksum.appendChild(resultDiv);
+                }
+            } catch (e) {
+                showToast('校验失败', 'error');
+            }
+        }
+
+        async function showSnapshotChain(snapshotId) {
+            try {
+                const res = await fetch(`/api/snapshot/chain?id=${snapshotId}`);
+                const chain = await res.json();
+
+                let chainInfo = '快照链:\n';
+                chain.forEach((s, i) => {
+                    chainInfo += `${i + 1}. ${s.name} (${s.isIncremental ? '增量' : '全量'}) - ${s.changedBlocks}/${s.blockCount}块变更\n`;
+                });
+                showToast(chainInfo, 'info');
+            } catch (e) {
+                showToast('获取快照链失败', 'error');
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('已复制到剪贴板', 'success');
+            });
+        }
+
+        async function cloneVolume() {
+            const sourceVolumeId = document.getElementById('cloneSourceVolSelect').value;
+            const targetName = document.getElementById('cloneTargetName').value;
+
+            if (!sourceVolumeId || !targetName) {
+                showToast('请填写完整信息', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/volume/clone', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sourceVolumeId, targetName })
+                });
+
+                if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(errText);
+                }
+
+                const vol = await res.json();
+                volumes.push(vol);
+                renderVolumes();
+                updateSelects();
+                updateStats();
+                showToast(`成功克隆卷: ${targetName}`, 'success');
+            } catch (e) {
+                showToast('克隆卷失败: ' + e.message, 'error');
+            }
+        }
+
+        async function getSpaceStats() {
+            const snapshotId = document.getElementById('spaceStatsSnapSelect').value;
+            const url = snapshotId ? `/api/snapshot/space-stats?id=${snapshotId}` : '/api/snapshot/space-stats';
+
+            try {
+                const res = await fetch(url);
+                if (!res.ok) {
+                    throw new Error('Failed to get space stats');
+                }
+
+                const stats = await res.json();
+                const resultDiv = document.getElementById('spaceStatsResult');
+
+                let detailsHtml = '';
+                stats.details.forEach(d => {
+                    detailsHtml += `
+                        <tr>
+                            <td>${d.snapshotName}</td>
+                            <td><span class="snapshot-type ${d.isIncremental ? 'incremental' : 'full'}">${d.isIncremental ? '增量' : '全量'}</span></td>
+                            <td>${d.blockCount}</td>
+                            <td>${formatBytes(d.sizeBytes)}</td>
+                            <td>${formatBytes(d.uniqueBytes)}</td>
+                            <td>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${d.changeRate * 100}%"></div>
+                                </div>
+                                <small>${(d.changeRate * 100).toFixed(1)}%</small>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                resultDiv.innerHTML = `
+                    <div class="stats-summary">
+                        <div class="stat-item">
+                            <span class="stat-label">总逻辑大小</span>
+                            <span class="stat-value">${formatBytes(stats.logicalSize)}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">实际占用</span>
+                            <span class="stat-value">${formatBytes(stats.uniqueSize)}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">节省空间</span>
+                            <span class="stat-value success">${stats.savingPercent.toFixed(1)}%</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">全量快照</span>
+                            <span class="stat-value">${stats.fullSnapshotCount}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">增量快照</span>
+                            <span class="stat-value">${stats.incrementalCount}</span>
+                        </div>
+                    </div>
+                    <h4 style="margin: 20px 0 10px; color: #333;">详细信息</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>快照名称</th>
+                                <th>类型</th>
+                                <th>块数</th>
+                                <th>大小</th>
+                                <th>唯一大小</th>
+                                <th>变更率</th>
+                            </tr>
+                        </thead>
+                        <tbody>${detailsHtml}</tbody>
+                    </table>
+                `;
+
+                showToast('空间统计获取成功', 'success');
+            } catch (e) {
+                showToast('获取空间统计失败: ' + e.message, 'error');
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type + ' show';
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 4000);
+        }
+
+        init();
+    </script>
+</body>
+</html>

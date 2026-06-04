@@ -1,0 +1,43 @@
+{
+  "Patient": {
+    "example-1": {
+      "resourceType": "Patient",
+      "id": "example-1",
+      "name": [
+        {
+          "family": "张三",
+          "given": [
+            "小明"
+          ]
+        }
+      ],
+      "gender": "male",
+      "birthDate": "1990-01-15",
+      "meta": {
+        "versionId": "1",
+        "lastUpdated": "2026-06-01T15:40:56.072Z"
+      }
+    }
+  },
+  "Observation": {
+    "obs-1": {
+      "resourceType": "Observation",
+      "id": "obs-1",
+      "status": "final",
+      "code": {
+        "text": "体重"
+      },
+      "subject": {
+        "reference": "Patient/example-1"
+      },
+      "valueQuantity": {
+        "value": 70,
+        "unit": "kg"
+      },
+      "meta": {
+        "versionId": "1",
+        "lastUpdated": "2026-06-01T15:40:56.076Z"
+      }
+    }
+  }
+}
