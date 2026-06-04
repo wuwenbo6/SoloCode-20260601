@@ -8,6 +8,9 @@ import {
   MOUSE_INTERACTION_SIZE,
   CAMERA_SIZE,
   RENDER_PARAMS_SIZE,
+  SPHERE_SIZE,
+  MAX_SPHERES,
+  SELF_COLLISION_SIZE,
   MOUSE_MODE,
   createParticles,
   createSprings,
@@ -21,6 +24,8 @@ import {
   type SimParams,
   type WindParams,
   type MouseInteraction,
+  type SphereCollider,
+  type SelfCollisionParams,
 } from './types';
 
 import computeShaderSource from './shaders/cloth_compute.wgsl?raw';
@@ -39,6 +44,9 @@ export class ClothSimulation {
   private mouseBuffer!: GPUBuffer;
   private cameraBuffer!: GPUBuffer;
   private renderParamsBuffer!: GPUBuffer;
+  private sphereBuffer!: GPUBuffer;
+  private selfCollisionBuffer!: GPUBuffer;
+  private readbackBuffer!: GPUBuffer;
 
   private computeBindGroup!: GPUBindGroup;
   private renderBindGroup!: GPUBindGroup;
@@ -50,6 +58,7 @@ export class ClothSimulation {
   private pipelineSolve!: GPUComputePipeline;
   private pipelineIntegrate!: GPUComputePipeline;
   private pipelineTear!: GPUComputePipeline;
+  private pipelineSelfCollision!: GPUComputePipeline;
 
   private pipelineTri!: GPURenderPipeline;
   private pipelineWire!: GPURenderPipeline;
@@ -94,7 +103,20 @@ export class ClothSimulation {
   private pinnedCorners: boolean = true;
   private showStress: boolean = true;
   private showWireframe: boolean = false;
+  private showSpheres: boolean = true;
   private maxTension: number = 0.5;
+
+  private spheres: SphereCollider[] = [];
+  private selfCollisionParams: SelfCollisionParams = {
+    thickness: 0.05,
+    stiffness: 0.3,
+    enabled: 0,
+  };
+
+  private exporting: boolean = false;
+  private exportFrame: boolean = false;
+  private exportFrameCount: number = 0;
+  private exportFrames: string[] = [];
 
   private animationId: number | null = null;
   private lastTime: number = 0;
@@ -121,6 +143,15 @@ export class ClothSimulation {
         this.particleInitialPositions[idx * 3 + 1] = 5;
         this.particleInitialPositions[idx * 3 + 2] = (y - GRID_SIZE / 2) * spacing;
       }
+    }
+
+    this.spheres = [
+      { position: [0, 0, 0], radius: 1.5 },
+      { position: [2, -1, 1], radius: 0 },
+      { position: [-2, -0.5, -1], radius: 0 },
+    ];
+    for (let i = this.spheres.length; i < MAX_SPHERES; i++) {
+      this.spheres.push({ position: [0, 0, 0], radius: 0 });
     }
   }
 
@@ -206,6 +237,21 @@ export class ClothSimulation {
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     );
 
+    this.sphereBuffer = this.createBuffer(
+      SPHERE_SIZE * MAX_SPHERES,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    );
+
+    this.selfCollisionBuffer = this.createBuffer(
+      SELF_COLLISION_SIZE,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    );
+
+    this.readbackBuffer = this.createBuffer(
+      PARTICLE_COUNT * PARTICLE_SIZE,
+      GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
+    );
+
     this.pinCorners();
   }
 
@@ -233,6 +279,8 @@ export class ClothSimulation {
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+        { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+        { binding: 6, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
       ],
     });
 
@@ -244,6 +292,8 @@ export class ClothSimulation {
         { binding: 2, resource: { buffer: this.simParamsBuffer } },
         { binding: 3, resource: { buffer: this.windParamsBuffer } },
         { binding: 4, resource: { buffer: this.mouseBuffer } },
+        { binding: 5, resource: { buffer: this.sphereBuffer } },
+        { binding: 6, resource: { buffer: this.selfCollisionBuffer } },
       ],
     });
 
@@ -296,6 +346,11 @@ export class ClothSimulation {
     this.pipelineTear = this.device.createComputePipeline({
       layout: this.computePipelineLayout,
       compute: { module: computeModule, entryPoint: 'tearSprings' },
+    });
+
+    this.pipelineSelfCollision = this.device.createComputePipeline({
+      layout: this.computePipelineLayout,
+      compute: { module: computeModule, entryPoint: 'solveSelfCollision' },
     });
 
     const renderModule = this.device.createShaderModule({ code: renderShaderSource });
@@ -406,6 +461,30 @@ export class ClothSimulation {
     this.device.queue.writeBuffer(this.renderParamsBuffer, 0, data);
   }
 
+  private updateSphereParams(): void {
+    const data = new Float32Array((SPHERE_SIZE / 4) * MAX_SPHERES);
+    for (let i = 0; i < MAX_SPHERES; i++) {
+      const sphere = this.spheres[i];
+      const offset = i * (SPHERE_SIZE / 4);
+      data[offset + 0] = sphere.position[0];
+      data[offset + 1] = sphere.position[1];
+      data[offset + 2] = sphere.position[2];
+      data[offset + 3] = sphere.radius;
+    }
+    this.device.queue.writeBuffer(this.sphereBuffer, 0, data);
+  }
+
+  private updateSelfCollisionParams(): void {
+    const data = new Float32Array(SELF_COLLISION_SIZE / 4);
+    const uintView = new Uint32Array(data.buffer);
+
+    data[0] = this.selfCollisionParams.thickness;
+    data[1] = this.selfCollisionParams.stiffness;
+    uintView[2] = this.selfCollisionParams.enabled;
+
+    this.device.queue.writeBuffer(this.selfCollisionBuffer, 0, data);
+  }
+
   private pinCorners(): void {
     const corners = [
       getParticleIndex(0, 0),
@@ -456,6 +535,55 @@ export class ClothSimulation {
     this.simParams.subSteps = value;
   }
 
+  public setSpherePosition(index: number, x: number, y: number, z: number): void {
+    if (index >= 0 && index < MAX_SPHERES) {
+      this.spheres[index].position = [x, y, z];
+    }
+  }
+
+  public setSphereRadius(index: number, radius: number): void {
+    if (index >= 0 && index < MAX_SPHERES) {
+      this.spheres[index].radius = radius;
+    }
+  }
+
+  public setSelfCollisionThickness(value: number): void {
+    this.selfCollisionParams.thickness = value;
+  }
+
+  public setSelfCollisionStiffness(value: number): void {
+    this.selfCollisionParams.stiffness = value;
+  }
+
+  public toggleSelfCollision(): void {
+    this.selfCollisionParams.enabled = this.selfCollisionParams.enabled ? 0 : 1;
+  }
+
+  public toggleSpheres(): void {
+    this.showSpheres = !this.showSpheres;
+  }
+
+  public startExport(): void {
+    this.exporting = true;
+    this.exportFrame = true;
+    this.exportFrameCount = 0;
+    this.exportFrames = [];
+  }
+
+  public stopExport(): string[] {
+    this.exporting = false;
+    this.exportFrame = false;
+    return this.exportFrames;
+  }
+
+  public isExporting(): boolean {
+    return this.exporting;
+  }
+
+  public getExportFrameCount(): number {
+    return this.exportFrameCount;
+  }
+
   public setMouseMode(mode: MouseMode): void {
     this.mouse.mode = mode;
     this.mouse.active = 0;
@@ -492,6 +620,8 @@ export class ClothSimulation {
     this.pinCorners();
     this.updateMouseParams();
     this.updateRenderParams();
+    this.updateSphereParams();
+    this.updateSelfCollisionParams();
   }
 
   public handleMouseDown(screenX: number, screenY: number): void {
@@ -609,7 +739,60 @@ export class ClothSimulation {
     this.compute();
     this.render();
 
+    if (this.exporting && this.exportFrame) {
+      this.exportFrame = false;
+      this.exportCurrentFrame().then((obj) => {
+        this.exportFrames.push(obj);
+        this.exportFrameCount++;
+        this.exportFrame = true;
+      });
+    }
+
     this.animationId = requestAnimationFrame(() => this.animate());
+  }
+
+  private async exportCurrentFrame(): Promise<string> {
+    const encoder = this.device.createCommandEncoder();
+    encoder.copyBufferToBuffer(
+      this.particleBuffer,
+      0,
+      this.readbackBuffer,
+      0,
+      PARTICLE_COUNT * PARTICLE_SIZE
+    );
+    this.device.queue.submit([encoder.finish()]);
+
+    await this.readbackBuffer.mapAsync(GPUMapMode.READ);
+    const data = new Float32Array(this.readbackBuffer.getMappedRange());
+
+    let obj = `# Cloth frame ${this.exportFrameCount}\n`;
+    obj += `# ${PARTICLE_COUNT} vertices, ${2 * CELL_COUNT} faces\n\n`;
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const offset = i * (PARTICLE_SIZE / 4);
+      const x = data[offset + 0];
+      const y = data[offset + 1];
+      const z = data[offset + 2];
+      obj += `v ${x.toFixed(6)} ${y.toFixed(6)} ${z.toFixed(6)}\n`;
+    }
+
+    obj += '\n';
+
+    for (let y = 0; y < GRID_SIZE - 1; y++) {
+      for (let x = 0; x < GRID_SIZE - 1; x++) {
+        const i00 = y * GRID_SIZE + x + 1;
+        const i10 = y * GRID_SIZE + x + 2;
+        const i01 = (y + 1) * GRID_SIZE + x + 1;
+        const i11 = (y + 1) * GRID_SIZE + x + 2;
+
+        obj += `f ${i00} ${i10} ${i11}\n`;
+        obj += `f ${i00} ${i11} ${i01}\n`;
+      }
+    }
+
+    this.readbackBuffer.unmap();
+
+    return obj;
   }
 
   private compute(): void {
@@ -619,6 +802,9 @@ export class ClothSimulation {
 
     const savedDt = this.simParams.deltaTime;
     this.simParams.deltaTime = subDt;
+
+    this.updateSphereParams();
+    this.updateSelfCollisionParams();
 
     for (let s = 0; s < subSteps; s++) {
       const pass = encoder.beginComputePass();
@@ -632,6 +818,11 @@ export class ClothSimulation {
       for (let i = 0; i < solverIterations; i++) {
         pass.setPipeline(this.pipelineSolve);
         pass.dispatchWorkgroups(Math.ceil(this.springCount / 64));
+      }
+
+      if (this.selfCollisionParams.enabled) {
+        pass.setPipeline(this.pipelineSelfCollision);
+        pass.dispatchWorkgroups(Math.ceil(PARTICLE_COUNT / 64));
       }
 
       pass.setPipeline(this.pipelineIntegrate);

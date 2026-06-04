@@ -51,11 +51,25 @@ struct MouseInteraction {
     force: vec3f,
 };
 
+struct SphereCollider {
+    position: vec3f,
+    radius: f32,
+};
+
+struct SelfCollisionParams {
+    thickness: f32,
+    stiffness: f32,
+    enabled: u32,
+    _pad: u32,
+};
+
 @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
 @group(0) @binding(1) var<storage, read_write> springs: array<Spring>;
 @group(0) @binding(2) var<uniform> simParams: SimParams;
 @group(0) @binding(3) var<uniform> windParams: WindParams;
 @group(0) @binding(4) var<uniform> mouse: MouseInteraction;
+@group(0) @binding(5) var<uniform> spheres: array<SphereCollider, 8>;
+@group(0) @binding(6) var<uniform> selfCollision: SelfCollisionParams;
 
 fn getCompliance(type: u32) -> f32 {
     if (type == 0u) { return simParams.structCompliance; }
@@ -179,7 +193,20 @@ fn integratePositions(@builtin(global_invocation_id) gid: vec3u) {
         return;
     }
 
-    let newPos = p.predictPosition;
+    var newPos = p.predictPosition;
+
+    for (var si = 0u; si < 8u; si++) {
+        let sphere = spheres[si];
+        if (sphere.radius > 0.0) {
+            let delta = newPos - sphere.position;
+            let dist = length(delta);
+            let minDist = sphere.radius + 0.005;
+            if (dist < minDist && dist > 0.0001) {
+                let dir = delta / dist;
+                newPos = sphere.position + dir * minDist;
+            }
+        }
+    }
 
     if (newPos.y < -3.0) {
         p.prevPosition = vec3f(newPos.x, -3.0 + (newPos.y - p.position.y) * 0.3, newPos.z);
@@ -187,6 +214,52 @@ fn integratePositions(@builtin(global_invocation_id) gid: vec3u) {
     } else {
         p.prevPosition = p.position;
         p.position = newPos;
+    }
+}
+
+@compute @workgroup_size(64)
+fn solveSelfCollision(@builtin(global_invocation_id) gid: vec3u) {
+    let idx = gid.x;
+    if (idx >= simParams.numParticles) { return; }
+    if (selfCollision.enabled == 0u) { return; }
+
+    var pi = &particles[idx];
+    if (pi.pinned == 1u) { return; }
+
+    let thickness = selfCollision.thickness;
+    let gridSize = 128u;
+
+    let piX = idx % gridSize;
+    let piY = idx / gridSize;
+
+    let searchRadius = 2u;
+
+    for (var dy = -i32(searchRadius); dy <= i32(searchRadius); dy++) {
+        for (var dx = -i32(searchRadius); dx <= i32(searchRadius); dx++) {
+            if (dx == 0 && dy == 0) { continue; }
+
+            let nx = i32(piX) + dx;
+            let ny = i32(piY) + dy;
+
+            if (nx < 0 || nx >= i32(gridSize) || ny < 0 || ny >= i32(gridSize)) { continue; }
+
+            let j = u32(ny) * gridSize + u32(nx);
+            if (j >= simParams.numParticles) { continue; }
+
+            var pj = particles[j];
+            if (pj.pinned == 1u) { continue; }
+
+            let delta = pi.predictPosition - pj.predictPosition;
+            let dist = length(delta);
+
+            if (dist < thickness && dist > 0.0001) {
+                let penetration = thickness - dist;
+                let dir = delta / dist;
+
+                let push = dir * penetration * 0.5 * selfCollision.stiffness;
+                pi.predictPosition += push * pi.invMass;
+            }
+        }
     }
 }
 

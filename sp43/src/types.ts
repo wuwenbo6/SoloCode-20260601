@@ -65,6 +65,17 @@ export interface MouseInteraction {
   force: [number, number, number];
 }
 
+export interface SphereCollider {
+  position: [number, number, number];
+  radius: number;
+}
+
+export interface SelfCollisionParams {
+  thickness: number;
+  stiffness: number;
+  enabled: number;
+}
+
 export interface Camera {
   viewProj: Float32Array;
   position: [number, number, number];
@@ -77,6 +88,9 @@ export const WIND_PARAMS_SIZE = 32;
 export const MOUSE_INTERACTION_SIZE = 48;
 export const CAMERA_SIZE = 80;
 export const RENDER_PARAMS_SIZE = 16;
+export const SPHERE_SIZE = 16;
+export const MAX_SPHERES = 8;
+export const SELF_COLLISION_SIZE = 16;
 
 export function getParticleIndex(x: number, y: number): number {
   return y * GRID_SIZE + x;

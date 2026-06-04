@@ -198,6 +198,31 @@
       <button id="reset">重置</button>
       <button id="pinToggle">固定四角</button>
     </div>
+
+    <div class="section-title">碰撞</div>
+    <div class="control-group">
+      <label>球体半径 <span class="value" id="sphereRadius-val">1.5</span></label>
+      <input type="range" id="sphereRadius" min="0" max="3" step="0.1" value="1.5">
+    </div>
+    <div class="control-buttons">
+      <button id="selfCollisionToggle">自碰撞: 关</button>
+    </div>
+    <div class="control-group">
+      <label>自碰撞厚度 <span class="value" id="selfCollisionThickness-val">0.05</span></label>
+      <input type="range" id="selfCollisionThickness" min="0.01" max="0.2" step="0.01" value="0.05">
+    </div>
+    <div class="control-group">
+      <label>自碰撞刚度 <span class="value" id="selfCollisionStiffness-val">0.3</span></label>
+      <input type="range" id="selfCollisionStiffness" min="0.1" max="1.0" step="0.1" value="0.3">
+    </div>
+
+    <div class="section-title">导出</div>
+    <div class="control-buttons">
+      <button id="exportBtn">开始导出 OBJ</button>
+    </div>
+    <div class="control-group">
+      <label>导出帧: <span class="value" id="exportFrameCount">0</span></label>
+    </div>
   </div>
   <div id="info">
     <div>FPS: <span id="fps">0</span></div>

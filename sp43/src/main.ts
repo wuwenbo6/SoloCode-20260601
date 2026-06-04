@@ -129,6 +129,60 @@ function setupControls() {
     pinToggleBtn.classList.toggle('active');
   });
 
+  const sphereRadius = document.getElementById('sphereRadius') as HTMLInputElement;
+  const sphereRadiusVal = document.getElementById('sphereRadius-val') as HTMLSpanElement;
+  sphereRadius.addEventListener('input', () => {
+    const val = parseFloat(sphereRadius.value);
+    sphereRadiusVal.textContent = val.toFixed(1);
+    simulation.setSphereRadius(0, val);
+  });
+
+  const selfCollisionToggle = document.getElementById('selfCollisionToggle') as HTMLButtonElement;
+  let selfCollisionEnabled = false;
+  selfCollisionToggle.addEventListener('click', () => {
+    simulation.toggleSelfCollision();
+    selfCollisionEnabled = !selfCollisionEnabled;
+    selfCollisionToggle.textContent = selfCollisionEnabled ? '自碰撞: 开' : '自碰撞: 关';
+    selfCollisionToggle.classList.toggle('active');
+  });
+
+  const selfCollisionThickness = document.getElementById('selfCollisionThickness') as HTMLInputElement;
+  const selfCollisionThicknessVal = document.getElementById('selfCollisionThickness-val') as HTMLSpanElement;
+  selfCollisionThickness.addEventListener('input', () => {
+    const val = parseFloat(selfCollisionThickness.value);
+    selfCollisionThicknessVal.textContent = val.toFixed(2);
+    simulation.setSelfCollisionThickness(val);
+  });
+
+  const selfCollisionStiffness = document.getElementById('selfCollisionStiffness') as HTMLInputElement;
+  const selfCollisionStiffnessVal = document.getElementById('selfCollisionStiffness-val') as HTMLSpanElement;
+  selfCollisionStiffness.addEventListener('input', () => {
+    const val = parseFloat(selfCollisionStiffness.value);
+    selfCollisionStiffnessVal.textContent = val.toFixed(1);
+    simulation.setSelfCollisionStiffness(val);
+  });
+
+  const exportBtn = document.getElementById('exportBtn') as HTMLButtonElement;
+  const exportFrameCount = document.getElementById('exportFrameCount') as HTMLSpanElement;
+  exportBtn.addEventListener('click', () => {
+    if (!simulation.isExporting()) {
+      simulation.startExport();
+      exportBtn.textContent = '停止导出';
+      exportBtn.classList.add('active');
+    } else {
+      const frames = simulation.stopExport();
+      exportBtn.textContent = '开始导出 OBJ';
+      exportBtn.classList.remove('active');
+      downloadObjFrames(frames);
+    }
+  });
+
+  setInterval(() => {
+    if (simulation && simulation.isExporting()) {
+      exportFrameCount.textContent = simulation.getExportFrameCount().toString();
+    }
+  }, 100);
+
   document.addEventListener('keydown', (e) => {
     if (e.key === '1') setActiveMode(MOUSE_MODE.DRAG, modeDrag);
     if (e.key === '2') setActiveMode(MOUSE_MODE.TEAR, modeTear);
@@ -140,6 +194,43 @@ function setupControls() {
     if (e.key === 's' || e.key === 'S') {
       simulation.toggleStressView();
     }
+  });
+}
+
+function downloadObjFrames(frames: string[]): void {
+  if (frames.length === 0) return;
+
+  const zip: string[] = [];
+  frames.forEach((frame, idx) => {
+    const filename = `cloth_${idx.toString().padStart(4, '0')}.obj`;
+    zip.push(`# ${filename}\n${frame}`);
+  });
+
+  const blob = new Blob([frames.join('\n\n')], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cloth_frames_${frames.length}.txt`;
+  a.textContent = '下载 OBJ 帧';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  frames.forEach((frame, idx) => {
+    const blobSingle = new Blob([frame], { type: 'text/plain' });
+    const urlSingle = URL.createObjectURL(blobSingle);
+    const aSingle = document.createElement('a');
+    aSingle.href = urlSingle;
+    aSingle.download = `cloth_${idx.toString().padStart(4, '0')}.obj`;
+    aSingle.style.display = 'none';
+    document.body.appendChild(aSingle);
+    setTimeout(() => {
+      aSingle.click();
+      document.body.removeChild(aSingle);
+      URL.revokeObjectURL(urlSingle);
+    }, idx * 100);
   });
 }
 
