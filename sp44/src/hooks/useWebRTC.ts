@@ -41,6 +41,11 @@ export function useWebRTC(roomId: string) {
     setIsEncrypted,
     addSharedKey,
     encryptionKeys,
+    addCaption,
+    updateParticipant,
+    addPoll,
+    updatePoll,
+    endPoll: endPollInStore,
   } = useMeetingStore();
 
   const sendMsg = useCallback((type: string, payload: Record<string, unknown> = {}): Promise<any> => {
@@ -254,14 +259,19 @@ export function useWebRTC(roomId: string) {
 
         switch (type) {
           case 'peer-joined': {
-            setParticipants(useMeetingStore.getState().participants.concat({
-              id: payload.peerId as string,
-              name: payload.displayName as string,
-              isHost: false,
-              isMuted: false,
-              isCameraOff: false,
-              audioLevel: 0,
-            }));
+            setParticipants([
+              ...useMeetingStore.getState().participants,
+              {
+                id: payload.peerId as string,
+                name: payload.displayName as string,
+                isHost: false,
+                isMuted: false,
+                isCameraOff: false,
+                audioLevel: 0,
+                isHandRaised: false,
+                handRaiseTime: 0,
+              },
+            ]);
             break;
           }
 
@@ -303,6 +313,7 @@ export function useWebRTC(roomId: string) {
               senderName: payload.displayName as string,
               text: payload.message as string,
               timestamp: payload.timestamp as number,
+              type: 'chat',
             });
             break;
           }
@@ -314,6 +325,58 @@ export function useWebRTC(roomId: string) {
 
           case 'recording-stopped': {
             useMeetingStore.getState().setIsRecording(false);
+            break;
+          }
+
+          case 'hand-raised': {
+            updateParticipant(payload.peerId as string, {
+              isHandRaised: payload.raised as boolean,
+            });
+            break;
+          }
+
+          case 'poll-started': {
+            const options = payload.options as string[];
+            addPoll({
+              id: payload.pollId as string,
+              question: payload.question as string,
+              options,
+              isAnonymous: payload.isAnonymous as boolean,
+              allowMultiple: payload.allowMultiple as boolean,
+              creatorId: payload.creatorId as string,
+              creatorName: payload.creatorName as string,
+              isActive: true,
+              createdAt: Date.now(),
+              results: options.map(() => 0),
+              totalVotes: 0,
+            });
+            break;
+          }
+
+          case 'poll-updated': {
+            updatePoll(payload.pollId as string, {
+              results: payload.results as number[],
+            });
+            break;
+          }
+
+          case 'poll-ended': {
+            endPollInStore(payload.pollId as string, {
+              results: payload.results as number[],
+              totalVotes: payload.totalVotes as number,
+            });
+            break;
+          }
+
+          case 'caption': {
+            addCaption({
+              id: payload.id as string,
+              speakerId: payload.peerId as string,
+              speakerName: payload.displayName as string,
+              text: payload.text as string,
+              timestamp: payload.timestamp as number,
+              isFinal: true,
+            });
             break;
           }
         }
@@ -447,8 +510,55 @@ export function useWebRTC(roomId: string) {
       senderName: userName || 'You',
       text,
       timestamp: Date.now(),
+      type: 'chat',
     });
   }, [userName, addChatMessage]);
+
+  const raiseHand = useCallback((raised: boolean) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== ws.OPEN) return;
+    ws.send(JSON.stringify({
+      type: 'raise-hand',
+      payload: { raised },
+    }));
+    useMeetingStore.getState().setIsHandRaised(raised);
+  }, []);
+
+  const startPoll = useCallback((question: string, options: string[], isAnonymous: boolean, allowMultiple: boolean) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== ws.OPEN) return;
+    ws.send(JSON.stringify({
+      type: 'poll-start',
+      payload: { question, options, isAnonymous, allowMultiple },
+    }));
+  }, []);
+
+  const votePoll = useCallback((pollId: string, optionIndices: number[]) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== ws.OPEN) return;
+    ws.send(JSON.stringify({
+      type: 'poll-vote',
+      payload: { pollId, optionIndices },
+    }));
+  }, []);
+
+  const endPoll = useCallback((pollId: string) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== ws.OPEN) return;
+    ws.send(JSON.stringify({
+      type: 'poll-end',
+      payload: { pollId },
+    }));
+  }, []);
+
+  const sendCaption = useCallback((text: string) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== ws.OPEN) return;
+    ws.send(JSON.stringify({
+      type: 'caption',
+      payload: { text },
+    }));
+  }, []);
 
   const exchangeEncryptionKey = useCallback(async () => {
     if (!encryptionKeys) return;
@@ -493,6 +603,11 @@ export function useWebRTC(roomId: string) {
     sendChatMessage,
     exchangeEncryptionKey,
     leaveMeeting,
+    raiseHand,
+    startPoll,
+    votePoll,
+    endPoll,
+    sendCaption,
   };
 }
 

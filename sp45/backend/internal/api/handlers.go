@@ -2,9 +2,11 @@ package api
 
 import (
 	"3d-printer-controller/internal/database"
+	"3d-printer-controller/internal/detection"
 	"3d-printer-controller/internal/models"
 	"3d-printer-controller/internal/printer"
 	"3d-printer-controller/internal/transport"
+	"3d-printer-controller/pkg/gcode"
 	"encoding/json"
 	"io"
 	"log"
@@ -24,18 +26,34 @@ var wsUpgrader = websocket.Upgrader{
 }
 
 type API struct {
-	pm         *printer.PrinterManager
+	hub        *printer.MultiPrinterHub
 	wtServer   *transport.WebTransportServer
-	fwUpgrade  *printer.FirmwareUpgrade
+	detector   *detection.PrintFailureDetector
 }
 
 func NewAPI() *API {
-	pm := printer.GetPrinterManager()
+	hub := printer.GetMultiPrinterHub()
 	return &API{
-		pm:        pm,
-		wtServer:  transport.GetWebTransportServer(),
-		fwUpgrade: printer.NewFirmwareUpgrade(pm),
+		hub:      hub,
+		wtServer: transport.GetWebTransportServer(),
+		detector: detection.NewPrintFailureDetector(),
 	}
+}
+
+func (a *API) getActivePM() *printer.PrinterManager {
+	inst := a.hub.GetActivePrinter()
+	if inst == nil {
+		return nil
+	}
+	return inst.Manager
+}
+
+func (a *API) getActiveFW() *printer.FirmwareUpgrade {
+	inst := a.hub.GetActivePrinter()
+	if inst == nil {
+		return nil
+	}
+	return inst.FirmwareUpgrade
 }
 
 func (a *API) SetupRoutes(r *gin.Engine) {
@@ -49,7 +67,6 @@ func (a *API) SetupRoutes(r *gin.Engine) {
 		api.POST("/connect", a.ConnectPrinter)
 		api.POST("/disconnect", a.DisconnectPrinter)
 		api.POST("/auto-reconnect", a.SetAutoReconnect)
-
 		api.POST("/command", a.SendCommand)
 
 		control := api.Group("/control")
@@ -65,6 +82,15 @@ func (a *API) SetupRoutes(r *gin.Engine) {
 
 		api.GET("/ws/status", a.StatusWebSocket)
 
+		printers := api.Group("/printers")
+		{
+			printers.GET("", a.ListPrinters)
+			printers.POST("", a.AddPrinter)
+			printers.DELETE("/:id", a.RemovePrinter)
+			printers.PUT("/active/:id", a.SetActivePrinter)
+			printers.GET("/:id/status", a.GetPrinterStatus)
+		}
+
 		video := api.Group("/video")
 		{
 			video.GET("/ws", func(c *gin.Context) {
@@ -73,6 +99,21 @@ func (a *API) SetupRoutes(r *gin.Engine) {
 			video.POST("/start", a.StartVideoStream)
 			video.POST("/stop", a.StopVideoStream)
 			video.GET("/info", a.GetVideoInfo)
+		}
+
+		detection := api.Group("/detection")
+		{
+			detection.GET("/alerts", a.GetDetectionAlerts)
+			detection.GET("/config", a.GetDetectionConfig)
+			detection.PUT("/config", a.UpdateDetectionConfig)
+			detection.POST("/clear", a.ClearDetectionAlerts)
+			detection.GET("/ws", a.DetectionWebSocket)
+		}
+
+		gcodeGroup := api.Group("/gcode")
+		{
+			gcodeGroup.POST("/preview", a.GCodePreview)
+			gcodeGroup.POST("/upload", a.UploadGCode)
 		}
 
 		firmware := api.Group("/firmware")
@@ -111,12 +152,22 @@ func CORS() gin.HandlerFunc {
 }
 
 func (a *API) GetStatus(c *gin.Context) {
-	status := a.pm.GetStatus()
+	pm := a.getActivePM()
+	if pm == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
+	status := pm.GetStatus()
 	c.JSON(http.StatusOK, status)
 }
 
 func (a *API) GetFirmwareInfo(c *gin.Context) {
-	info := a.pm.GetFirmwareInfo()
+	pm := a.getActivePM()
+	if pm == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
+	info := pm.GetFirmwareInfo()
 	if info == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "No firmware info available"})
 		return
@@ -125,7 +176,12 @@ func (a *API) GetFirmwareInfo(c *gin.Context) {
 }
 
 func (a *API) GetConnectionStatus(c *gin.Context) {
-	state := a.pm.GetConnectionState()
+	pm := a.getActivePM()
+	if pm == nil {
+		c.JSON(http.StatusOK, gin.H{"status": "disconnected", "connected": false})
+		return
+	}
+	state := pm.GetConnectionState()
 	c.JSON(http.StatusOK, state)
 }
 
@@ -137,7 +193,10 @@ func (a *API) SetAutoReconnect(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	a.pm.SetAutoReconnect(req.Enabled)
+	pm := a.getActivePM()
+	if pm != nil {
+		pm.SetAutoReconnect(req.Enabled)
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "autoReconnect": req.Enabled})
 }
 
@@ -157,20 +216,26 @@ func (a *API) ConnectPrinter(c *gin.Context) {
 		connType = printer.ConnSerial
 	}
 
-	err := a.pm.Connect(connType)
+	pm := a.getActivePM()
+	if pm == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
+
+	err := pm.Connect(connType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"connected": true,
-		"type":      connType,
-	})
+	c.JSON(http.StatusOK, gin.H{"connected": true, "type": connType})
 }
 
 func (a *API) DisconnectPrinter(c *gin.Context) {
-	a.pm.Disconnect()
+	pm := a.getActivePM()
+	if pm != nil {
+		pm.Disconnect()
+	}
 	c.JSON(http.StatusOK, gin.H{"connected": false})
 }
 
@@ -182,18 +247,26 @@ func (a *API) SendCommand(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	resp, err := a.pm.SendCommand(req.Command)
+	pm := a.getActivePM()
+	if pm == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
+	resp, err := pm.SendCommand(req.Command)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"response": resp})
 }
 
 func (a *API) PausePrint(c *gin.Context) {
-	err := a.pm.PausePrint()
+	pm := a.getActivePM()
+	if pm == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
+	err := pm.PausePrint()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -202,7 +275,12 @@ func (a *API) PausePrint(c *gin.Context) {
 }
 
 func (a *API) ResumePrint(c *gin.Context) {
-	err := a.pm.ResumePrint()
+	pm := a.getActivePM()
+	if pm == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
+	err := pm.ResumePrint()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -211,7 +289,12 @@ func (a *API) ResumePrint(c *gin.Context) {
 }
 
 func (a *API) StopPrint(c *gin.Context) {
-	err := a.pm.StopPrint()
+	pm := a.getActivePM()
+	if pm == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
+	err := pm.StopPrint()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -225,13 +308,16 @@ func (a *API) MoveAxis(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	err := a.pm.MoveAxis(&move)
+	pm := a.getActivePM()
+	if pm == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
+	err := pm.MoveAxis(&move)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
@@ -242,13 +328,16 @@ func (a *API) HomeAxis(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		req.Axis = "ALL"
 	}
-
-	err := a.pm.HomeAxis(req.Axis)
+	pm := a.getActivePM()
+	if pm == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
+	err := pm.HomeAxis(req.Axis)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
@@ -261,13 +350,16 @@ func (a *API) SetTemperature(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	err := a.pm.SetTemperature(req.Heater, req.Temp)
+	pm := a.getActivePM()
+	if pm == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
+	err := pm.SetTemperature(req.Heater, req.Temp)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
@@ -285,16 +377,17 @@ func (a *API) StartPrintJob(c *gin.Context) {
 		req.FileName = "print_job_" + time.Now().Format("20060102_150405") + ".gcode"
 	}
 
-	jobID, err := a.pm.StartPrintJob(req.FileName, req.FileSize)
+	pm := a.getActivePM()
+	if pm == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
+	jobID, err := pm.StartPrintJob(req.FileName, req.FileSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"job_id": jobID,
-		"status": "started",
-	})
+	c.JSON(http.StatusOK, gin.H{"job_id": jobID, "status": "started"})
 }
 
 func (a *API) StatusWebSocket(c *gin.Context) {
@@ -305,9 +398,14 @@ func (a *API) StatusWebSocket(c *gin.Context) {
 	}
 	defer conn.Close()
 
+	pm := a.getActivePM()
+	if pm == nil {
+		return
+	}
+
 	clientID := uuid.New().String()
-	statusChan := a.pm.AddStatusListener(clientID)
-	defer a.pm.RemoveStatusListener(clientID)
+	statusChan := pm.AddStatusListener(clientID)
+	defer pm.RemoveStatusListener(clientID)
 
 	go func() {
 		for {
@@ -330,6 +428,68 @@ func (a *API) StatusWebSocket(c *gin.Context) {
 	}
 }
 
+func (a *API) ListPrinters(c *gin.Context) {
+	printers := a.hub.GetAllPrinters()
+	c.JSON(http.StatusOK, gin.H{"printers": printers, "active": a.hub.GetActiveID()})
+}
+
+func (a *API) AddPrinter(c *gin.Context) {
+	var req struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Type string `json:"type"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.ID == "" {
+		req.ID = "printer-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	}
+	if req.Name == "" {
+		req.Name = "打印机 " + req.ID
+	}
+
+	connType := printer.ConnSimulator
+	inst, err := a.hub.AddPrinter(req.ID, req.Name, connType)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"id": inst.ID, "name": inst.Name, "status": "created"})
+}
+
+func (a *API) RemovePrinter(c *gin.Context) {
+	id := c.Param("id")
+	err := a.hub.RemovePrinter(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "removed"})
+}
+
+func (a *API) SetActivePrinter(c *gin.Context) {
+	id := c.Param("id")
+	err := a.hub.SetActivePrinter(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "active": id})
+}
+
+func (a *API) GetPrinterStatus(c *gin.Context) {
+	id := c.Param("id")
+	inst := a.hub.GetPrinter(id)
+	if inst == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "printer not found"})
+		return
+	}
+	status := inst.Manager.GetStatus()
+	c.JSON(http.StatusOK, status)
+}
+
 func (a *API) StartVideoStream(c *gin.Context) {
 	a.wtServer.StartStream()
 	c.JSON(http.StatusOK, gin.H{"status": "started"})
@@ -343,6 +503,107 @@ func (a *API) StopVideoStream(c *gin.Context) {
 func (a *API) GetVideoInfo(c *gin.Context) {
 	info := a.wtServer.GetStreamInfo()
 	c.JSON(http.StatusOK, info)
+}
+
+func (a *API) GetDetectionAlerts(c *gin.Context) {
+	limit := 20
+	if l := c.Query("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil {
+			limit = parsed
+		}
+	}
+	alerts := a.detector.GetAlerts(limit)
+	c.JSON(http.StatusOK, gin.H{"alerts": alerts, "enabled": a.detector.IsEnabled()})
+}
+
+func (a *API) GetDetectionConfig(c *gin.Context) {
+	config := a.detector.GetConfig()
+	c.JSON(http.StatusOK, config)
+}
+
+func (a *API) UpdateDetectionConfig(c *gin.Context) {
+	var config detection.DetectionConfig
+	if err := c.ShouldBindJSON(&config); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	a.detector.SetConfig(config)
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (a *API) ClearDetectionAlerts(c *gin.Context) {
+	a.detector.ClearAlerts()
+	c.JSON(http.StatusOK, gin.H{"status": "cleared"})
+}
+
+func (a *API) DetectionWebSocket(c *gin.Context) {
+	conn, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	clientID := uuid.New().String()
+	alertChan := a.hub.AddAlertListener(clientID)
+	defer a.hub.RemoveAlertListener(clientID)
+
+	go func() {
+		for {
+			_, _, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	for alert := range alertChan {
+		data, err := json.Marshal(alert)
+		if err != nil {
+			continue
+		}
+		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+			return
+		}
+	}
+}
+
+func (a *API) GCodePreview(c *gin.Context) {
+	var req struct {
+		Content string `json:"content"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Content == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "empty gcode content"})
+		return
+	}
+
+	preview := gcode.GeneratePreview(req.Content)
+	c.JSON(http.StatusOK, preview)
+}
+
+func (a *API) UploadGCode(c *gin.Context) {
+	file, _, err := c.Request.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
+		return
+	}
+	defer file.Close()
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	preview := gcode.GeneratePreview(string(content))
+	c.JSON(http.StatusOK, gin.H{
+		"size":    len(content),
+		"preview": preview,
+	})
 }
 
 func (a *API) UploadFirmware(c *gin.Context) {
@@ -359,10 +620,7 @@ func (a *API) UploadFirmware(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"size":    len(content),
-		"content": string(content),
-	})
+	c.JSON(http.StatusOK, gin.H{"size": len(content), "content": string(content)})
 }
 
 func (a *API) StartFirmwareUpgrade(c *gin.Context) {
@@ -374,7 +632,13 @@ func (a *API) StartFirmwareUpgrade(c *gin.Context) {
 		return
 	}
 
-	if a.fwUpgrade.IsInProgress() {
+	fw := a.getActiveFW()
+	if fw == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
+
+	if fw.IsInProgress() {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Upgrade already in progress"})
 		return
 	}
@@ -382,7 +646,7 @@ func (a *API) StartFirmwareUpgrade(c *gin.Context) {
 	progressChan := make(chan float64, 10)
 	errorChan := make(chan error, 1)
 
-	go a.fwUpgrade.PerformFullUpgrade(req.HexContent, progressChan, errorChan)
+	go fw.PerformFullUpgrade(req.HexContent, progressChan, errorChan)
 
 	go func() {
 		for range progressChan {
@@ -395,22 +659,30 @@ func (a *API) StartFirmwareUpgrade(c *gin.Context) {
 }
 
 func (a *API) GetFirmwareProgress(c *gin.Context) {
-	progress, current, total, lastErr := a.fwUpgrade.GetProgress()
-	resumeState := a.fwUpgrade.GetResumeState()
+	fw := a.getActiveFW()
+	if fw == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
+	progress, current, total, lastErr := fw.GetProgress()
+	resumeState := fw.GetResumeState()
 	c.JSON(http.StatusOK, gin.H{
-		"progress":     progress,
-		"currentPage":  current,
-		"totalPages":   total,
-		"inProgress":   a.fwUpgrade.IsInProgress(),
-		"paused":       a.fwUpgrade.IsPaused(),
-		"lastError":    lastErr,
-		"maxRetries":   a.fwUpgrade.GetMaxRetries(),
-		"resumeState":  resumeState,
+		"progress":    progress,
+		"currentPage": current,
+		"totalPages":  total,
+		"inProgress":  fw.IsInProgress(),
+		"paused":      fw.IsPaused(),
+		"lastError":   lastErr,
+		"maxRetries":  fw.GetMaxRetries(),
+		"resumeState": resumeState,
 	})
 }
 
 func (a *API) PauseFirmwareUpgrade(c *gin.Context) {
-	a.fwUpgrade.Pause()
+	fw := a.getActiveFW()
+	if fw != nil {
+		fw.Pause()
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "paused"})
 }
 
@@ -418,21 +690,32 @@ func (a *API) ResumeFirmwareUpgrade(c *gin.Context) {
 	var req struct {
 		HexContent string `json:"hex_content"`
 	}
+	fw := a.getActiveFW()
+	if fw == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no active printer"})
+		return
+	}
 	if err := c.ShouldBindJSON(&req); err == nil && req.HexContent != "" {
-		a.fwUpgrade.Start(req.HexContent)
+		fw.Start(req.HexContent)
 	} else {
-		a.fwUpgrade.Start("")
+		fw.Start("")
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "resumed"})
 }
 
 func (a *API) ResetFirmwareUpgrade(c *gin.Context) {
-	a.fwUpgrade.Reset()
+	fw := a.getActiveFW()
+	if fw != nil {
+		fw.Reset()
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "reset"})
 }
 
 func (a *API) CancelFirmwareUpgrade(c *gin.Context) {
-	a.fwUpgrade.Cancel()
+	fw := a.getActiveFW()
+	if fw != nil {
+		fw.Cancel()
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "cancelled"})
 }
 
@@ -458,9 +741,9 @@ func (a *API) GetPrintHistory(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"jobs":  jobs,
-		"total": total,
-		"limit": limit,
+		"jobs":   jobs,
+		"total":  total,
+		"limit":  limit,
 		"offset": offset,
 	})
 }

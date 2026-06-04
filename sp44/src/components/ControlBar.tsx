@@ -9,6 +9,9 @@ import {
   PhoneOff,
   Users,
   MessageSquare,
+  Captions,
+  Hand,
+  Vote,
 } from 'lucide-react';
 import { useMeetingStore } from '@/store/meetingStore';
 
@@ -19,6 +22,8 @@ interface ControlBarProps {
   onStopScreenShare: () => void;
   onToggleVirtualBg: () => void;
   onToggleRecording: () => void;
+  onToggleCaptions: () => void;
+  onRaiseHand: () => void;
   onLeave: () => void;
 }
 
@@ -29,6 +34,8 @@ export default function ControlBar({
   onStopScreenShare,
   onToggleVirtualBg,
   onToggleRecording,
+  onToggleCaptions,
+  onRaiseHand,
   onLeave,
 }: ControlBarProps) {
   const {
@@ -37,6 +44,8 @@ export default function ControlBar({
     isScreenSharing,
     isVirtualBgOn,
     isRecording,
+    isCaptioning,
+    isHandRaised,
     panelOpen,
     setPanelOpen,
   } = useMeetingStore();
@@ -46,6 +55,8 @@ export default function ControlBar({
   const btnGlass =
     'bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 hover:shadow-[0_0_20px_rgba(0,229,160,0.3)]';
   const btnOff = 'bg-red-500/80 hover:bg-red-500 border border-red-400/30';
+  const btnActive = 'bg-[#00e5a0]/30 border border-[#00e5a0]/50';
+  const btnYellow = 'bg-yellow-500/30 border border-yellow-500/50';
 
   return (
     <div className="flex items-center justify-center gap-3 px-6 py-4">
@@ -71,7 +82,7 @@ export default function ControlBar({
 
       <button
         onClick={isScreenSharing ? onStopScreenShare : onStartScreenShare}
-        className={`${btnBase} ${isScreenSharing ? 'bg-[#00e5a0]/30 border border-[#00e5a0]/50' : btnGlass}`}
+        className={`${btnBase} ${isScreenSharing ? btnActive : btnGlass}`}
         title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
       >
         <MonitorUp className="w-5 h-5 text-white" />
@@ -79,10 +90,29 @@ export default function ControlBar({
 
       <button
         onClick={onToggleVirtualBg}
-        className={`${btnBase} ${isVirtualBgOn ? 'bg-[#00e5a0]/30 border border-[#00e5a0]/50' : btnGlass}`}
+        className={`${btnBase} ${isVirtualBgOn ? btnActive : btnGlass}`}
         title="Virtual background"
       >
         <Image className="w-5 h-5 text-white" />
+      </button>
+
+      <button
+        onClick={onToggleCaptions}
+        className={`${btnBase} ${isCaptioning ? btnActive : btnGlass}`}
+        title={isCaptioning ? 'Turn off captions' : 'Turn on captions'}
+      >
+        <Captions className="w-5 h-5 text-white" />
+      </button>
+
+      <button
+        onClick={onRaiseHand}
+        className={`${btnBase} ${isHandRaised ? btnYellow : btnGlass}`}
+        title={isHandRaised ? 'Lower hand' : 'Raise hand'}
+      >
+        <Hand className={`w-5 h-5 ${isHandRaised ? 'text-yellow-300' : 'text-white'}`} />
+        {isHandRaised && (
+          <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-500 rounded-full animate-pulse" />
+        )}
       </button>
 
       <button
@@ -97,7 +127,7 @@ export default function ControlBar({
 
       <button
         onClick={() => setPanelOpen(panelOpen === 'participants' ? 'none' : 'participants')}
-        className={`${btnBase} ${panelOpen === 'participants' ? 'bg-[#00e5a0]/20 border border-[#00e5a0]/40' : btnGlass}`}
+        className={`${btnBase} ${panelOpen === 'participants' ? btnActive : btnGlass}`}
         title="Participants"
       >
         <Users className="w-5 h-5 text-white" />
@@ -105,10 +135,18 @@ export default function ControlBar({
 
       <button
         onClick={() => setPanelOpen(panelOpen === 'chat' ? 'none' : 'chat')}
-        className={`${btnBase} ${panelOpen === 'chat' ? 'bg-[#00e5a0]/20 border border-[#00e5a0]/40' : btnGlass}`}
+        className={`${btnBase} ${panelOpen === 'chat' ? btnActive : btnGlass}`}
         title="Chat"
       >
         <MessageSquare className="w-5 h-5 text-white" />
+      </button>
+
+      <button
+        onClick={() => setPanelOpen(panelOpen === 'poll' ? 'none' : 'poll')}
+        className={`${btnBase} ${panelOpen === 'poll' ? btnActive : btnGlass}`}
+        title="Polls"
+      >
+        <Vote className="w-5 h-5 text-white" />
       </button>
 
       <div className="w-px h-8 bg-white/10 mx-1" />

@@ -47,3 +47,15 @@ type TemperaturePoint struct {
 	Nozzle    float64   `json:"nozzle"`
 	Bed       float64   `json:"bed"`
 }
+
+type PrinterInfo struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Active    bool   `json:"active"`
+	Connected bool   `json:"connected"`
+	Status    string `json:"status"`
+	State     string `json:"state"`
+	Progress  float64 `json:"progress"`
+	NozzleTemp float64 `json:"nozzle_temp"`
+	BedTemp    float64 `json:"bed_temp"`
+}

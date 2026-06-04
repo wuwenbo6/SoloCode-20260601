@@ -1,18 +1,34 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useMeetingStore } from '@/store/meetingStore';
 import { useWebRTC } from '@/hooks/useWebRTC';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import VideoGrid from '@/components/VideoGrid';
 import ControlBar from '@/components/ControlBar';
 import EncryptionBadge from '@/components/EncryptionBadge';
 import ParticipantsPanel from '@/components/ParticipantsPanel';
 import ChatPanel from '@/components/ChatPanel';
+import CaptionDisplay from '@/components/CaptionDisplay';
+import PollPanel from '@/components/PollPanel';
+import HandRaiseIndicator from '@/components/HandRaiseIndicator';
 
 export default function Room() {
   const { roomId = '' } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const { isEncrypted, isRecording, isVirtualBgOn, setIsVirtualBgOn, panelOpen, userName, sharedKeys } =
-    useMeetingStore();
+  const {
+    isEncrypted,
+    isRecording,
+    isVirtualBgOn,
+    setIsVirtualBgOn,
+    panelOpen,
+    userName,
+    sharedKeys,
+    isCaptioning,
+    setIsCaptioning,
+    isHandRaised,
+    setIsHandRaised,
+    captions,
+  } = useMeetingStore();
 
   const {
     connected,
@@ -24,7 +40,34 @@ export default function Room() {
     stopRecording,
     sendChatMessage,
     leaveMeeting,
+    raiseHand,
+    startPoll,
+    votePoll,
+    endPoll,
+    sendCaption,
   } = useWebRTC(roomId);
+
+  const { isListening, transcript, startListening, stopListening } = useSpeechRecognition();
+
+  const handleToggleCaptions = useCallback(() => {
+    if (isCaptioning) {
+      stopListening();
+      setIsCaptioning(false);
+    } else {
+      startListening();
+      setIsCaptioning(true);
+    }
+  }, [isCaptioning, startListening, stopListening, setIsCaptioning]);
+
+  const handleRaiseHand = useCallback(() => {
+    raiseHand(!isHandRaised);
+  }, [raiseHand, isHandRaised]);
+
+  useEffect(() => {
+    if (isCaptioning && transcript && transcript.trim()) {
+      sendCaption(transcript);
+    }
+  }, [transcript, isCaptioning, sendCaption]);
 
   useEffect(() => {
     useMeetingStore.getState().setRoomId(roomId);
@@ -60,8 +103,15 @@ export default function Room() {
           {connected && (
             <div className="w-2 h-2 rounded-full bg-[#00e5a0] animate-pulse" />
           )}
+          {isListening && (
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#00e5a0]/20">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#00e5a0] animate-pulse" />
+              <span className="text-[#00e5a0] text-xs font-medium">CC</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
+          <HandRaiseIndicator />
           <EncryptionBadge isEncrypted={isEncrypted} fingerprint={fingerprint} />
           {isRecording && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/20">
@@ -73,12 +123,24 @@ export default function Room() {
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden relative">
           <VideoGrid />
+          {isCaptioning && captions.length > 0 && (
+            <div className="absolute bottom-20 left-0 right-0 flex justify-center">
+              <CaptionDisplay />
+            </div>
+          )}
         </div>
 
         {panelOpen === 'participants' && <ParticipantsPanel />}
         {panelOpen === 'chat' && <ChatPanel onSendMessage={sendChatMessage} />}
+        {panelOpen === 'poll' && (
+          <PollPanel
+            onStartPoll={startPoll}
+            onVote={votePoll}
+            onEndPoll={endPoll}
+          />
+        )}
       </div>
 
       <div className="relative">
@@ -90,6 +152,8 @@ export default function Room() {
             onStopScreenShare={stopScreenShare}
             onToggleVirtualBg={() => setIsVirtualBgOn(!isVirtualBgOn)}
             onToggleRecording={handleToggleRecording}
+            onToggleCaptions={handleToggleCaptions}
+            onRaiseHand={handleRaiseHand}
             onLeave={handleLeave}
           />
         </div>

@@ -89,3 +89,64 @@ export interface TemperaturePoint {
 }
 
 export type PrinterState = 'idle' | 'printing' | 'paused' | 'homing' | 'heating' | 'busy';
+
+export interface FailureAlert {
+  type: 'warping' | 'clog' | 'spaghetti' | 'layer_shift' | 'stringing';
+  severity: 'info' | 'warning' | 'critical';
+  confidence: number;
+  message: string;
+  timestamp: number;
+  frame_num: number;
+  region: { x: number; y: number; width: number; height: number };
+}
+
+export interface DetectionConfig {
+  enabled: boolean;
+  sensitivity: number;
+  warp_threshold: number;
+  clog_threshold: number;
+  alert_cooldown_ms: number;
+  min_confidence: number;
+}
+
+export interface PrinterInfo {
+  id: string;
+  name: string;
+  active: boolean;
+  connected: boolean;
+  status: string;
+  state: string;
+  progress: number;
+  nozzle_temp: number;
+  bed_temp: number;
+}
+
+export interface GCodePathSegment {
+  type: string;
+  from_x: number;
+  from_y: number;
+  from_z: number;
+  to_x: number;
+  to_y: number;
+  to_z: number;
+  extrude: boolean;
+  speed: number;
+  layer: number;
+  line_num: number;
+}
+
+export interface GCodePreview {
+  segments: GCodePathSegment[];
+  bounds: {
+    min_x: number;
+    max_x: number;
+    min_y: number;
+    max_y: number;
+    min_z: number;
+    max_z: number;
+  };
+  layer_count: number;
+  total_lines: number;
+  filament_mm: number;
+  est_time_min: number;
+}

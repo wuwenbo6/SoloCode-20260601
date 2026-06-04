@@ -7,6 +7,10 @@ import type {
   PrintHistoryResponse,
   VideoStreamInfo,
   FirmwareProgress,
+  FailureAlert,
+  DetectionConfig,
+  PrinterInfo,
+  GCodePreview,
 } from '../types';
 
 const API_BASE = '/api';
@@ -60,6 +64,23 @@ export const printerAPI = {
     api.post('/control/start-print', { file_name: fileName, file_size: fileSize || 0 }).then((r) => r.data),
 };
 
+export const multiPrinterAPI = {
+  list: (): Promise<{ printers: PrinterInfo[]; active: string }> =>
+    api.get('/printers').then((r) => r.data),
+
+  add: (id: string, name: string, type: string = 'simulator'): Promise<{ id: string; name: string; status: string }> =>
+    api.post('/printers', { id, name, type }).then((r) => r.data),
+
+  remove: (id: string): Promise<{ status: string }> =>
+    api.delete(`/printers/${id}`).then((r) => r.data),
+
+  setActive: (id: string): Promise<{ status: string; active: string }> =>
+    api.put(`/printers/active/${id}`).then((r) => r.data),
+
+  getStatus: (id: string): Promise<PrinterStatus> =>
+    api.get(`/printers/${id}/status`).then((r) => r.data),
+};
+
 export const videoAPI = {
   getInfo: (): Promise<VideoStreamInfo> =>
     api.get('/video/info').then((r) => r.data),
@@ -69,6 +90,33 @@ export const videoAPI = {
 
   stopStream: (): Promise<{ status: string }> =>
     api.post('/video/stop').then((r) => r.data),
+};
+
+export const detectionAPI = {
+  getAlerts: (limit = 20): Promise<{ alerts: FailureAlert[]; enabled: boolean }> =>
+    api.get('/detection/alerts', { params: { limit } }).then((r) => r.data),
+
+  getConfig: (): Promise<DetectionConfig> =>
+    api.get('/detection/config').then((r) => r.data),
+
+  updateConfig: (config: DetectionConfig): Promise<{ status: string }> =>
+    api.put('/detection/config', config).then((r) => r.data),
+
+  clearAlerts: (): Promise<{ status: string }> =>
+    api.post('/detection/clear').then((r) => r.data),
+};
+
+export const gcodeAPI = {
+  preview: (content: string): Promise<GCodePreview> =>
+    api.post('/gcode/preview', { content }).then((r) => r.data),
+
+  upload: (file: File): Promise<{ size: number; preview: GCodePreview }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/gcode/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data);
+  },
 };
 
 export const firmwareAPI = {

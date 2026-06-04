@@ -1,7 +1,25 @@
 import type { WebSocket } from 'ws'
 import type { types } from 'mediasoup'
+import { v4 as uuidv4 } from 'uuid'
 import { roomManager } from './room-manager.js'
 import { startRecording, stopRecording } from './recording.js'
+import { playbackManager } from './playback-manager.js'
+
+interface Poll {
+  id: string
+  question: string
+  options: string[]
+  isAnonymous: boolean
+  allowMultiple: boolean
+  creatorId: string
+  creatorName: string
+  votes: Map<string, number[]>
+  isActive: boolean
+  createdAt: number
+}
+
+const roomPolls = new Map<string, Poll[]>()
+const roomHands = new Map<string, Set<string>>()
 
 interface ClientMessage {
   type: string
@@ -242,11 +260,194 @@ async function handleMessage(ws: WebSocket, conn: PeerConnection, msg: ClientMes
       }
       try {
         const filePath = stopRecording(conn.roomId)
+        const room = roomManager.getRoom(conn.roomId)
+        playbackManager.stopRecording(conn.roomId, room?.name || 'Unknown Meeting', filePath)
         send(ws, 'recording-stopped', { roomId: conn.roomId, filePath }, msgId)
         broadcastToRoom(conn.roomId, 'recording-stopped', { roomId: conn.roomId })
       } catch (err) {
         send(ws, 'error', { message: err instanceof Error ? err.message : 'Stop recording failed' })
       }
+      break
+    }
+
+    case 'raise-hand': {
+      if (!conn.roomId || !conn.peerId) {
+        send(ws, 'error', { message: 'Not in a room' })
+        return
+      }
+      const isRaised = payload.raised as boolean
+      let hands = roomHands.get(conn.roomId)
+      if (!hands) {
+        hands = new Set()
+        roomHands.set(conn.roomId, hands)
+      }
+      if (isRaised) {
+        hands.add(conn.peerId)
+        playbackManager.addEvent(conn.roomId, 'hand-raise', {
+          peerId: conn.peerId,
+          displayName: conn.displayName,
+        })
+      } else {
+        hands.delete(conn.peerId)
+        playbackManager.addEvent(conn.roomId, 'hand-lower', {
+          peerId: conn.peerId,
+          displayName: conn.displayName,
+        })
+      }
+      broadcastToRoom(conn.roomId, 'hand-raised', {
+        peerId: conn.peerId,
+        displayName: conn.displayName,
+        raised: isRaised,
+      })
+      break
+    }
+
+    case 'poll-start': {
+      if (!conn.roomId || !conn.peerId) {
+        send(ws, 'error', { message: 'Not in a room' })
+        return
+      }
+      const question = payload.question as string
+      const options = payload.options as string[]
+      const isAnonymous = payload.isAnonymous as boolean
+      const allowMultiple = payload.allowMultiple as boolean
+
+      const poll: Poll = {
+        id: uuidv4(),
+        question,
+        options,
+        isAnonymous,
+        allowMultiple,
+        creatorId: conn.peerId,
+        creatorName: conn.displayName,
+        votes: new Map(),
+        isActive: true,
+        createdAt: Date.now(),
+      }
+
+      let polls = roomPolls.get(conn.roomId)
+      if (!polls) {
+        polls = []
+        roomPolls.set(conn.roomId, polls)
+      }
+      polls.push(poll)
+
+      playbackManager.addEvent(conn.roomId, 'poll-start', {
+        pollId: poll.id,
+        question,
+        options,
+        creatorId: conn.peerId,
+        creatorName: conn.displayName,
+      })
+
+      broadcastToRoom(conn.roomId, 'poll-started', {
+        pollId: poll.id,
+        question,
+        options,
+        isAnonymous,
+        allowMultiple,
+        creatorId: conn.peerId,
+        creatorName: conn.displayName,
+      })
+      break
+    }
+
+    case 'poll-vote': {
+      if (!conn.roomId || !conn.peerId) {
+        send(ws, 'error', { message: 'Not in a room' })
+        return
+      }
+      const pollId = payload.pollId as string
+      const optionIndices = payload.optionIndices as number[]
+
+      const polls = roomPolls.get(conn.roomId)
+      if (polls) {
+        const poll = polls.find((p) => p.id === pollId && p.isActive)
+        if (poll) {
+          poll.votes.set(conn.peerId, optionIndices)
+
+          const results = poll.options.map((_, idx) => {
+            let count = 0
+            for (const votes of poll.votes.values()) {
+              if (votes.includes(idx)) count++
+            }
+            return count
+          })
+
+          playbackManager.addEvent(conn.roomId, 'poll-vote', {
+            pollId,
+            voterId: conn.peerId,
+          })
+
+          broadcastToRoom(conn.roomId, 'poll-updated', {
+            pollId,
+            results,
+          })
+        }
+      }
+      break
+    }
+
+    case 'poll-end': {
+      if (!conn.roomId || !conn.peerId) {
+        send(ws, 'error', { message: 'Not in a room' })
+        return
+      }
+      const pollId = payload.pollId as string
+
+      const polls = roomPolls.get(conn.roomId)
+      if (polls) {
+        const poll = polls.find((p) => p.id === pollId && p.isActive)
+        if (poll) {
+          poll.isActive = false
+
+          const results = poll.options.map((_, idx) => {
+            let count = 0
+            for (const votes of poll.votes.values()) {
+              if (votes.includes(idx)) count++
+            }
+            return count
+          })
+          const totalVotes = poll.votes.size
+
+          playbackManager.addEvent(conn.roomId, 'poll-end', {
+            pollId,
+            results,
+          })
+
+          broadcastToRoom(conn.roomId, 'poll-ended', {
+            pollId,
+            results,
+            totalVotes,
+          })
+        }
+      }
+      break
+    }
+
+    case 'caption': {
+      if (!conn.roomId || !conn.peerId) {
+        send(ws, 'error', { message: 'Not in a room' })
+        return
+      }
+      const text = payload.text as string
+      const captionId = uuidv4()
+
+      playbackManager.addCaption(
+        conn.roomId,
+        captionId,
+        conn.peerId,
+        conn.displayName,
+        text
+      )
+
+      broadcastToRoom(conn.roomId, 'caption', {
+        id: captionId,
+        peerId: conn.peerId,
+        displayName: conn.displayName,
+        text,
+        timestamp: Date.now(),
+      })
       break
     }
 
